@@ -23,15 +23,37 @@ impl<'a> Lexer<'a> {
     pub fn next_token(&mut self) -> Token {
         self.skip_whitespace();
         let token = match self.current_char {
-            '=' => Token::Assign,
+            '=' => {
+                if self.next_char == '='{
+                    self.seek_char();
+                    Token::Equal
+                }
+                else{
+                    Token::Assign
+                }
+            },
             ';' => Token::Semicolon,
             '(' => Token::Lparentheses,
             ')' => Token::Rparentheses,
             ',' => Token::Comma,
             '+' => Token::Plus,
+            '-' => Token::Minus,
+            '!' => {
+                if self.next_char == '='{
+                    self.seek_char();
+                    Token::NotEqual
+                }
+                else{
+                    Token::Exclamation
+                }
+            },
+            '/' => Token::Slash,
+            '*' => Token::Asterisk,
+            '<' => Token::LessThan,
+            '>' => Token::GraterThan,
             '{' => Token::Lbrace,
             '}' => Token::Rbrace,
-            '\u{0}' => Token::EOF,
+            '\u{0}' => Token::EndOfFile,
             ch => {
                 if is_letter(ch) {
                     let identifier = self.read_by_checker(is_letter);
@@ -78,6 +100,11 @@ impl<'a> Lexer<'a> {
         match identifier.as_str() {
             "fn" => Token::Function,
             "let" => Token::Let,
+            "true" => Token::True,
+            "false" => Token::False,
+            "if" => Token::If,
+            "else" => Token::Else,
+            "return" => Token::Return,
             _ => Token::Identifer(identifier),
         }
     }
@@ -102,10 +129,25 @@ mod tests {
     fn next_token() {
         let input = "let five = 5;
 let ten = 10;
+
 let add = fn(x, y) {
 x + y;
 };
-let result = add(five, ten);";
+
+let result = add(five, ten);
+
+!-/*5;
+5 < 10 > 5;
+
+if (5 < 10) {
+    return true;
+} else {
+    return false;
+}
+
+10 == 10;
+10 != 9;
+";
 
         let tokens = [
             Token::Let,
@@ -144,7 +186,44 @@ let result = add(five, ten);";
             Token::Identifer("ten".to_string()),
             Token::Rparentheses,
             Token::Semicolon,
-            Token::EOF,
+            Token::Exclamation,
+            Token::Minus,
+            Token::Slash,
+            Token::Asterisk,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::Integer(5),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::GraterThan,
+            Token::Integer(5),
+            Token::Semicolon,
+            Token::If,
+            Token::Lparentheses,
+            Token::Integer(5),
+            Token::LessThan,
+            Token::Integer(10),
+            Token::Rparentheses,
+            Token::Lbrace,
+            Token::Return,
+            Token::True,
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Else,
+            Token::Lbrace,
+            Token::Return,
+            Token::False,
+            Token::Semicolon,
+            Token::Rbrace,
+            Token::Integer(10),
+            Token::Equal,
+            Token::Integer(10),
+            Token::Semicolon,
+            Token::Integer(10),
+            Token::NotEqual,
+            Token::Integer(9),
+            Token::Semicolon,
+            Token::EndOfFile,
         ];
 
         let mut lexer = Lexer::new(input);
