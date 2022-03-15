@@ -2,7 +2,7 @@
 pub enum Token {
     Illegal,
     EndOfFile,
-    Identifer(String),
+    Identifier(String),
     Integer(i32),
     Assign,
     Plus,
