@@ -11,7 +11,7 @@ fn main() {
         stdin().read_line(&mut scan).expect("Failed to read line.");
         let mut lexer = Lexer::new(&scan);
         loop{
-            let tok = lexer.next_token();
+            let tok = lexer.read_next_token();
             if tok == Token::EndOfFile{
                 break;
             }

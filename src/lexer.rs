@@ -20,7 +20,7 @@ impl<'a> Lexer<'a> {
         lexer
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn read_next_token(&mut self) -> Token {
         self.skip_whitespace();
         let token = match self.current_char {
             '=' => {
@@ -126,7 +126,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn next_token() {
+    fn test_next_token() {
         let input = "let five = 5;
 let ten = 10;
 
@@ -229,7 +229,7 @@ if (5 < 10) {
         let mut lexer = Lexer::new(input);
 
         for tok in tokens.iter() {
-            let next_token = &lexer.next_token();
+            let next_token = &lexer.read_next_token();
             assert_eq!(next_token, tok);
         }
     }
