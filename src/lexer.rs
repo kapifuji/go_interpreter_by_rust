@@ -24,14 +24,13 @@ impl<'a> Lexer<'a> {
         self.skip_whitespace();
         let token = match self.current_char {
             '=' => {
-                if self.next_char == '='{
+                if self.next_char == '=' {
                     self.seek_char();
                     Token::Equal
-                }
-                else{
+                } else {
                     Token::Assign
                 }
-            },
+            }
             ';' => Token::Semicolon,
             '(' => Token::Lparentheses,
             ')' => Token::Rparentheses,
@@ -39,14 +38,13 @@ impl<'a> Lexer<'a> {
             '+' => Token::Plus,
             '-' => Token::Minus,
             '!' => {
-                if self.next_char == '='{
+                if self.next_char == '=' {
                     self.seek_char();
                     Token::NotEqual
-                }
-                else{
+                } else {
                     Token::Exclamation
                 }
-            },
+            }
             '/' => Token::Slash,
             '*' => Token::Asterisk,
             '<' => Token::LessThan,

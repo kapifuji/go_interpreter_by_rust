@@ -1,21 +1,20 @@
-use std::io::{stdin, stdout, Write};
-use go_interpreter::token::Token;
 use go_interpreter::lexer::Lexer;
+use go_interpreter::token::Token;
+use std::io::{stdin, stdout, Write};
 
 fn main() {
     let prompt = ">> ";
-    loop{
+    loop {
         print!("{}", prompt);
         stdout().flush().unwrap();
         let mut scan = String::new();
         stdin().read_line(&mut scan).expect("Failed to read line.");
         let mut lexer = Lexer::new(&scan);
-        loop{
+        loop {
             let tok = lexer.read_next_token();
-            if tok == Token::EndOfFile{
+            if tok == Token::EndOfFile {
                 break;
-            }
-            else{
+            } else {
                 println!("{:?}", tok);
             }
         }
