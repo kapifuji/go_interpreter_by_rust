@@ -55,7 +55,7 @@ impl<'a> Lexer<'a> {
             ch => {
                 if is_letter(ch) {
                     let identifier = self.read_by_checker(is_letter);
-                    return Lexer::lookup_identifier(identifier);
+                    return Lexer::lookup_identifier(identifier.as_str());
                 } else if is_digit(ch) {
                     let number_str = self.read_by_checker(is_digit);
                     return Token::Integer(number_str.parse().unwrap());
@@ -94,8 +94,8 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn lookup_identifier(identifier: String) -> Token {
-        match identifier.as_str() {
+    fn lookup_identifier(identifier: &str) -> Token {
+        match identifier {
             "fn" => Token::Function,
             "let" => Token::Let,
             "true" => Token::True,
@@ -103,7 +103,7 @@ impl<'a> Lexer<'a> {
             "if" => Token::If,
             "else" => Token::Else,
             "return" => Token::Return,
-            _ => Token::Identifier(identifier),
+            _ => Token::Identifier(identifier.to_string()),
         }
     }
 }
