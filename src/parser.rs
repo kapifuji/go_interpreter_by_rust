@@ -27,7 +27,7 @@ impl<'a> Parser<'a> {
         self.next_token = self.lexer.read_next_token();
     }
 
-    pub fn parse_program(&mut self) -> Result<ast::Program, error::ParserError> {
+    pub fn parse_program(&mut self) -> Result<ast::Program, Box<dyn std::error::Error>> {
         let mut program = ast::Program::new();
         while self.current_token != token::Token::EndOfFile {
             let statement = self.parse_statement()?;
@@ -37,20 +37,20 @@ impl<'a> Parser<'a> {
         Ok(program)
     }
 
-    fn parse_statement(&mut self) -> Result<ast::Statement, error::ParserError> {
+    fn parse_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         match self.current_token {
             token::Token::Let => self.parse_let_statement(),
-            _ => Err(error::ParserError::UnImplementation),
+            _ => Err(error::ParserError::UnImplementation)?,
         }
     }
 
-    fn parse_let_statement(&mut self) -> Result<ast::Statement, error::ParserError> {
+    fn parse_let_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         let identifier = if let token::Token::Identifier(identifier) = &self.next_token {
             ast::Expression::Identifier(identifier.to_owned())
         } else {
             return Err(error::ParserError::NotFoundIdentifier{
                 found_token: self.next_token.clone()
-            });
+            })?;
         };
 
         self.seek_token(); // Identifier に進む
@@ -74,7 +74,7 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn expect_next(&mut self, token: token::Token) -> Result<(), error::ParserError>{
+    fn expect_next(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>>{
         if self.next_token == token{
             Ok(())
         }
@@ -82,7 +82,7 @@ impl<'a> Parser<'a> {
             Err(error::ParserError::UnexpectedToken{
                 actual_token: self.next_token.clone(),
                 expected_token: token
-            })
+            })?
         }
     }
 }
@@ -92,7 +92,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_let_statements() {
+    fn test_let_statements() -> Result<(), Box<dyn std::error::Error>>{
         let input = "
 let x = 5;
 let y = 5;
@@ -101,7 +101,7 @@ let foobar = 838383;
         let lexer = lexer::Lexer::new(&input);
         let mut parser = Parser::new(lexer);
 
-        let program = parser.parse_program().unwrap();
+        let program = parser.parse_program()?;
         if program.statements.len() != 3 {
             panic!(
                 "expected 3 statements, but got {}",
@@ -113,8 +113,9 @@ let foobar = 838383;
         let tests = vec!["x", "y", "foobar"];
 
         for (i, test) in tests.iter().enumerate() {
-            test_let_statement(&program.statements[i], test)
+            test_let_statement(&program.statements[i], test);
         }
+        Ok(())
     }
 
     fn test_let_statement(statement: &ast::Statement, expected_name: &str) {
