@@ -4,8 +4,8 @@ use crate::token;
 #[derive(Debug)]
 pub enum ParserError{
     UnexpectedToken{actual_token: token::Token, expected_token: token::Token},
-    NotFoundIdentifier{found_token: token::Token},
-    UnImplementation
+    NotFoundLetIdentifier{found_token: token::Token},
+    UnImplementationStatemant{found_token: token::Token},
 }
 
 impl std::fmt::Display for ParserError{
@@ -14,7 +14,7 @@ impl std::fmt::Display for ParserError{
             self::ParserError::UnexpectedToken{actual_token, expected_token} => {
                 write!(f, "({:?}を期待しましたが、{:?}でした。)", expected_token, actual_token)
             },
-            self::ParserError::NotFoundIdentifier{found_token} => {
+            self::ParserError::NotFoundLetIdentifier{found_token} => {
                 write!(f, "(Identifierを期待しましたが、{:?}でした。)", found_token)
             }
             _ => write!(f, "(未実装エラーです。)")

@@ -8,6 +8,7 @@ pub enum Statement {
         identifier: Expression,
         value: Expression,
     },
+    Return(Expression)
 }
 
 #[derive(Debug)]

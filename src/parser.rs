@@ -40,7 +40,10 @@ impl<'a> Parser<'a> {
     fn parse_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         match self.current_token {
             token::Token::Let => self.parse_let_statement(),
-            _ => Err(error::ParserError::UnImplementation)?,
+            token::Token::Return => self.parse_return_statement(),
+            _ => Err(error::ParserError::UnImplementationStatemant{
+                found_token: self.current_token.clone()
+            })?,
         }
     }
 
@@ -48,7 +51,7 @@ impl<'a> Parser<'a> {
         let identifier = if let token::Token::Identifier(identifier) = &self.next_token {
             ast::Expression::Identifier(identifier.to_owned())
         } else {
-            return Err(error::ParserError::NotFoundIdentifier{
+            return Err(error::ParserError::NotFoundLetIdentifier{
                 found_token: self.next_token.clone()
             })?;
         };
@@ -59,19 +62,30 @@ impl<'a> Parser<'a> {
 
         self.seek_token(); // Assign に進む
 
+        let expression = self.parse_expression()?;
+
+        self.seek_token(); // Semicolon に進む
+
+        Ok(ast::Statement::Let {
+            identifier: identifier,
+            value: expression,
+        })
+    }
+
+    fn parse_return_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>>{
+        let expression = self.parse_expression()?;
+        self.seek_token(); // Semicolon に進む
+        Ok(ast::Statement::Return(expression))
+    }
+
+    fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>>{
         loop { // 次のトークンが Semicolon となるまで進める
             if let Ok(_) = self.expect_next(token::Token::Semicolon){
                 break;
             };
             self.seek_token();
         }
-
-        self.seek_token(); // Semicolon に進む
-
-        Ok(ast::Statement::Let {
-            identifier: identifier,
-            value: ast::Expression::Identifier("dummy".to_string()), // 未実装なので仮の値
-        })
+        Ok(ast::Expression::Identifier("dummy".to_string())) // 仮の値
     }
 
     fn expect_next(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>>{
@@ -125,6 +139,38 @@ let foobar = 838383;
             }
         } else {
             panic!("expected ast::Statement::Let, but got {:?}", statement);
+        }
+    }
+
+    #[test]
+    fn test_return_statements() -> Result<(), Box<dyn std::error::Error>>{
+        let input = "
+return 5;
+return 10;
+return 993322;
+";
+        let lexer = lexer::Lexer::new(&input);
+        let mut parser = Parser::new(lexer);
+
+        let program = parser.parse_program()?;
+        if program.statements.len() != 3 {
+            panic!(
+                "expected 3 statements, but got {}",
+                program.statements.len()
+            );
+        }
+        assert_eq!(program.statements.len(), 3);
+
+        for i in 0..3{
+            test_return_statement(&program.statements[i]);
+        }
+        Ok(())
+    }
+
+    fn test_return_statement(statement: &ast::Statement){
+        if let ast::Statement::Return(_) = statement {
+        } else {
+            panic!("expected ast::Statement::Return, but got {:?}", statement);
         }
     }
 }
