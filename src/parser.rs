@@ -41,9 +41,7 @@ impl<'a> Parser<'a> {
         match self.current_token {
             token::Token::Let => self.parse_let_statement(),
             token::Token::Return => self.parse_return_statement(),
-            _ => Err(error::ParserError::UnImplementationStatemant {
-                found_token: self.current_token.clone(),
-            })?,
+            _ => self.parse_expression_statement()
         }
     }
 
@@ -78,6 +76,12 @@ impl<'a> Parser<'a> {
         Ok(ast::Statement::Return(expression))
     }
 
+    fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>>{
+        let expression = self.parse_expression2()?;
+        self.seek_token(); // Semicolon に進む
+        Ok(ast::Statement::Expression(expression))
+    }
+
     fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         loop {
             // 次のトークンが Semicolon となるまで進める
@@ -87,6 +91,24 @@ impl<'a> Parser<'a> {
             self.seek_token();
         }
         Ok(ast::Expression::Identifier("dummy".to_string())) // 仮の値
+    }
+
+    fn parse_expression2(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        let expression = match self.current_token.clone(){
+            token::Token::Identifier(identifier) => self.parse_identifier(identifier.as_str())?,
+            other => {
+                println!("{:?}", other);
+                return Err(error::ParserError::UnImplementationParser("式のパーサーが未実装です。"))?
+            }
+        };
+        
+        //self.seek_token(); // 式の最後 に進む
+        self.expect_next(token::Token::Semicolon)?;
+        Ok(expression)
+    }
+
+    fn parse_identifier(&mut self, identifier: &str) -> Result<ast::Expression, Box<dyn std::error::Error>>{
+        Ok(ast::Expression::Identifier(identifier.to_string()))
     }
 
     fn expect_next(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
@@ -166,5 +188,37 @@ return 993322;
         } else {
             panic!("expected ast::Statement::Return, but got {:?}", statement);
         }
+    }
+
+    #[test]
+    fn test_identifier_expression() {
+        let input = "foobar;";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+
+        let expression = if let ast::Statement::Expression(expression) = statement{
+            expression
+        }
+        else{
+            panic!("expected ast::Statement::Expression, but got {:?}", statement);
+        };
+
+        let identifier = if let ast::Expression::Identifier(identifier) = expression{
+            identifier
+        }
+        else{
+            panic!("expected ast::Expression::Identifier, but got {:?}", expression);
+        };
+
+        assert_eq!(identifier, "foobar");
     }
 }
