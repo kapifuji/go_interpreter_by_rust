@@ -1,7 +1,7 @@
 use crate::ast;
+use crate::error;
 use crate::lexer;
 use crate::token;
-use crate::error;
 
 struct Parser<'a> {
     lexer: lexer::Lexer<'a>,
@@ -41,8 +41,8 @@ impl<'a> Parser<'a> {
         match self.current_token {
             token::Token::Let => self.parse_let_statement(),
             token::Token::Return => self.parse_return_statement(),
-            _ => Err(error::ParserError::UnImplementationStatemant{
-                found_token: self.current_token.clone()
+            _ => Err(error::ParserError::UnImplementationStatemant {
+                found_token: self.current_token.clone(),
             })?,
         }
     }
@@ -51,8 +51,8 @@ impl<'a> Parser<'a> {
         let identifier = if let token::Token::Identifier(identifier) = &self.next_token {
             ast::Expression::Identifier(identifier.to_owned())
         } else {
-            return Err(error::ParserError::NotFoundLetIdentifier{
-                found_token: self.next_token.clone()
+            return Err(error::ParserError::NotFoundLetIdentifier {
+                found_token: self.next_token.clone(),
             })?;
         };
 
@@ -72,15 +72,16 @@ impl<'a> Parser<'a> {
         })
     }
 
-    fn parse_return_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>>{
+    fn parse_return_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         let expression = self.parse_expression()?;
         self.seek_token(); // Semicolon に進む
         Ok(ast::Statement::Return(expression))
     }
 
-    fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>>{
-        loop { // 次のトークンが Semicolon となるまで進める
-            if let Ok(_) = self.expect_next(token::Token::Semicolon){
+    fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        loop {
+            // 次のトークンが Semicolon となるまで進める
+            if let Ok(_) = self.expect_next(token::Token::Semicolon) {
                 break;
             };
             self.seek_token();
@@ -88,14 +89,13 @@ impl<'a> Parser<'a> {
         Ok(ast::Expression::Identifier("dummy".to_string())) // 仮の値
     }
 
-    fn expect_next(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>>{
-        if self.next_token == token{
+    fn expect_next(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
+        if self.next_token == token {
             Ok(())
-        }
-        else{
-            Err(error::ParserError::UnexpectedToken{
+        } else {
+            Err(error::ParserError::UnexpectedToken {
                 actual_token: self.next_token.clone(),
-                expected_token: token
+                expected_token: token,
             })?
         }
     }
@@ -106,7 +106,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_let_statements(){
+    fn test_let_statements() {
         let input = "
 let x = 5;
 let y = 5;
@@ -115,9 +115,9 @@ let foobar = 838383;
         let lexer = lexer::Lexer::new(&input);
         let mut parser = Parser::new(lexer);
 
-        let program = match parser.parse_program(){
+        let program = match parser.parse_program() {
             Ok(program) => program,
-            Err(err) => panic!("エラー: {}", err)
+            Err(err) => panic!("エラー: {}", err),
         };
 
         assert_eq!(program.statements.len(), 3);
@@ -140,7 +140,7 @@ let foobar = 838383;
     }
 
     #[test]
-    fn test_return_statements(){
+    fn test_return_statements() {
         let input = "
 return 5;
 return 10;
@@ -149,19 +149,19 @@ return 993322;
         let lexer = lexer::Lexer::new(&input);
         let mut parser = Parser::new(lexer);
 
-        let program = match parser.parse_program(){
+        let program = match parser.parse_program() {
             Ok(program) => program,
-            Err(err) => panic!("エラー: {}", err)
+            Err(err) => panic!("エラー: {}", err),
         };
 
         assert_eq!(program.statements.len(), 3);
 
-        for i in 0..3{
+        for i in 0..3 {
             test_return_statement(&program.statements[i]);
         }
     }
 
-    fn test_return_statement(statement: &ast::Statement){
+    fn test_return_statement(statement: &ast::Statement) {
         if let ast::Statement::Return(_) = statement {
         } else {
             panic!("expected ast::Statement::Return, but got {:?}", statement);

@@ -9,7 +9,7 @@ pub enum Statement {
         value: Expression,
     },
     Return(Expression),
-    Expression(Expression)
+    Expression(Expression),
 }
 
 #[derive(Debug)]
@@ -25,9 +25,9 @@ impl Program {
             statements: Vec::new(),
         }
     }
-    pub fn to_code(&self) -> String{
+    fn to_code(&self) -> String {
         let mut code = String::new();
-        for statement in &self.statements{
+        for statement in &self.statements {
             code.push_str(statement.to_code().as_str());
             code.push('\n');
         }
@@ -36,21 +36,21 @@ impl Program {
 }
 
 impl Statement {
-    pub fn to_code(&self) -> String{
+    fn to_code(&self) -> String {
         let mut statement = String::new();
-        match self{
-            Statement::Let{identifier, value} => {
+        match self {
+            Statement::Let { identifier, value } => {
                 statement.push_str("let ");
                 statement.push_str(identifier.to_code().as_str());
                 statement.push_str(" = ");
                 statement.push_str(value.to_code().as_str());
                 statement.push(';');
-            },
+            }
             Statement::Return(expression) => {
                 statement.push_str("return ");
                 statement.push_str(expression.to_code().as_str());
                 statement.push(';');
-            },
+            }
             Statement::Expression(expression) => {
                 statement.push_str(expression.to_code().as_str());
                 statement.push(';');
@@ -61,18 +61,17 @@ impl Statement {
 }
 
 impl Expression {
-    pub fn to_code(&self) -> String{
-        match self{
+    fn to_code(&self) -> String {
+        match self {
             Expression::Identifier(identifier) => identifier.to_string(),
             Expression::Integer(integer) => integer.to_string(),
-            Expression::Illegal => "[illegal expression]".to_string()
+            Expression::Illegal => "[illegal expression]".to_string(),
         }
     }
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::*;
 
     #[test]
@@ -83,18 +82,14 @@ return x;
 ";
         let mut program = Program::new();
 
-        let statement1 = Statement::Let{
+        let statement1 = Statement::Let {
             identifier: Expression::Identifier("x".to_string()),
-            value: Expression::Integer(100)
+            value: Expression::Integer(100),
         };
 
-        let statement2 = Statement::Return(
-            Expression::Identifier("x".to_string())
-        );
+        let statement2 = Statement::Return(Expression::Identifier("x".to_string()));
 
-        let statement3 = Statement::Expression(
-            Expression::Integer(500)
-        );
+        let statement3 = Statement::Expression(Expression::Integer(500));
 
         program.statements.push(statement1);
         program.statements.push(statement2);
