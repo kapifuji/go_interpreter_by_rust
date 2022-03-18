@@ -77,24 +77,14 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>>{
         // 式文は文のトークンが無いのでここでseek不要
-        let expression = self.parse_expression2()?;
+        let expression = self.parse_expression()?;
         Ok(ast::Statement::Expression(expression))
     }
 
     fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
-        loop {
-            // 現在トークンが Semicolon となるまで進める
-            if let Ok(_) = self.expect_current(token::Token::Semicolon) {
-                break;
-            };
-            self.seek_token();
-        }
-        Ok(ast::Expression::Identifier("dummy".to_string())) // 仮の値
-    }
-
-    fn parse_expression2(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         let expression = match self.current_token.clone(){
             token::Token::Identifier(identifier) => self.parse_identifier(identifier.as_str())?,
+            token::Token::Integer(integer) => self.parse_integer(integer)?,
             other => {
                 println!("{:?}", other);
                 return Err(error::ParserError::UnImplementationParser("式のパーサーが未実装です。"))?
@@ -108,6 +98,10 @@ impl<'a> Parser<'a> {
 
     fn parse_identifier(&mut self, identifier: &str) -> Result<ast::Expression, Box<dyn std::error::Error>>{
         Ok(ast::Expression::Identifier(identifier.to_string()))
+    }
+
+    fn parse_integer(&mut self, identifier: i32) -> Result<ast::Expression, Box<dyn std::error::Error>>{
+        Ok(ast::Expression::Integer(identifier))
     }
 
     fn expect_current(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
@@ -219,5 +213,37 @@ return 993322;
         };
 
         assert_eq!(identifier, "foobar");
+    }
+
+    #[test]
+    fn test_integer_expression() {
+        let input = "300;";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+
+        let expression = if let ast::Statement::Expression(expression) = statement{
+            expression
+        }
+        else{
+            panic!("expected ast::Statement::Expression, but got {:?}", statement);
+        };
+
+        let integer = if let ast::Expression::Integer(integer) = expression{
+            integer
+        }
+        else{
+            panic!("expected ast::Expression::Integer, but got {:?}", expression);
+        };
+
+        assert_eq!(*integer, 300);
     }
 }
