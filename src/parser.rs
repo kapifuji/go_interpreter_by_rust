@@ -32,7 +32,7 @@ impl<'a> Parser<'a> {
         while self.current_token != token::Token::EndOfFile {
             let statement = self.parse_statement()?;
             program.statements.push(statement);
-            self.seek_token();
+            self.seek_token(); // 次の文 へ進む
         }
         Ok(program)
     }
@@ -46,7 +46,8 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_let_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
-        let identifier = if let token::Token::Identifier(identifier) = &self.next_token {
+        self.seek_token(); // Identifier に進む
+        let identifier = if let token::Token::Identifier(identifier) = &self.current_token {
             ast::Expression::Identifier(identifier.to_owned())
         } else {
             return Err(error::ParserError::NotFoundLetIdentifier {
@@ -54,15 +55,13 @@ impl<'a> Parser<'a> {
             })?;
         };
 
-        self.seek_token(); // Identifier に進む
-
-        self.expect_next(token::Token::Assign)?;
-
         self.seek_token(); // Assign に進む
 
-        let expression = self.parse_expression()?;
+        self.expect_current(token::Token::Assign)?;
 
-        self.seek_token(); // Semicolon に進む
+        self.seek_token(); // 式 に進む
+
+        let expression = self.parse_expression()?;
 
         Ok(ast::Statement::Let {
             identifier: identifier,
@@ -71,21 +70,21 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_return_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
+        self.seek_token(); // 式 に進む
         let expression = self.parse_expression()?;
-        self.seek_token(); // Semicolon に進む
         Ok(ast::Statement::Return(expression))
     }
 
     fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>>{
+        // 式文は文のトークンが無いのでここでseek不要
         let expression = self.parse_expression2()?;
-        self.seek_token(); // Semicolon に進む
         Ok(ast::Statement::Expression(expression))
     }
 
     fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         loop {
-            // 次のトークンが Semicolon となるまで進める
-            if let Ok(_) = self.expect_next(token::Token::Semicolon) {
+            // 現在トークンが Semicolon となるまで進める
+            if let Ok(_) = self.expect_current(token::Token::Semicolon) {
                 break;
             };
             self.seek_token();
@@ -102,8 +101,8 @@ impl<'a> Parser<'a> {
             }
         };
         
-        //self.seek_token(); // 式の最後 に進む
-        self.expect_next(token::Token::Semicolon)?;
+        self.seek_token(); // Semicolon に進む
+        self.expect_current(token::Token::Semicolon)?;
         Ok(expression)
     }
 
@@ -111,12 +110,12 @@ impl<'a> Parser<'a> {
         Ok(ast::Expression::Identifier(identifier.to_string()))
     }
 
-    fn expect_next(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
-        if self.next_token == token {
+    fn expect_current(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
+        if self.current_token == token {
             Ok(())
         } else {
             Err(error::ParserError::UnexpectedToken {
-                actual_token: self.next_token.clone(),
+                actual_token: self.current_token.clone(),
                 expected_token: token,
             })?
         }
