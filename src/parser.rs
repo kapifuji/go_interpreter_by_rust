@@ -148,12 +148,7 @@ return 993322;
         let mut parser = Parser::new(lexer);
 
         let program = parser.parse_program()?;
-        if program.statements.len() != 3 {
-            panic!(
-                "expected 3 statements, but got {}",
-                program.statements.len()
-            );
-        }
+
         assert_eq!(program.statements.len(), 3);
 
         for i in 0..3{
