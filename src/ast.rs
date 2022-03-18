@@ -8,7 +8,8 @@ pub enum Statement {
         identifier: Expression,
         value: Expression,
     },
-    Return(Expression)
+    Return(Expression),
+    Expression(Expression)
 }
 
 #[derive(Debug)]
@@ -49,6 +50,10 @@ impl Statement {
                 statement.push_str("return ");
                 statement.push_str(expression.to_code().as_str());
                 statement.push(';');
+            },
+            Statement::Expression(expression) => {
+                statement.push_str(expression.to_code().as_str());
+                statement.push(';');
             }
         }
         statement
@@ -74,6 +79,7 @@ mod tests{
     fn test_to_code() {
         let expected_code = "let x = 100;
 return x;
+500;
 ";
         let mut program = Program::new();
 
@@ -86,8 +92,13 @@ return x;
             Expression::Identifier("x".to_string())
         );
 
+        let statement3 = Statement::Expression(
+            Expression::Integer(500)
+        );
+
         program.statements.push(statement1);
         program.statements.push(statement2);
+        program.statements.push(statement3);
 
         assert_eq!(program.to_code(), expected_code);
     }
