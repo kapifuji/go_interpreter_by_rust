@@ -106,7 +106,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_let_statements() -> Result<(), Box<dyn std::error::Error>>{
+    fn test_let_statements(){
         let input = "
 let x = 5;
 let y = 5;
@@ -115,7 +115,10 @@ let foobar = 838383;
         let lexer = lexer::Lexer::new(&input);
         let mut parser = Parser::new(lexer);
 
-        let program = parser.parse_program()?;
+        let program = match parser.parse_program(){
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err)
+        };
 
         assert_eq!(program.statements.len(), 3);
 
@@ -124,7 +127,6 @@ let foobar = 838383;
         for (i, test) in tests.iter().enumerate() {
             test_let_statement(&program.statements[i], test);
         }
-        Ok(())
     }
 
     fn test_let_statement(statement: &ast::Statement, expected_name: &str) {
@@ -138,7 +140,7 @@ let foobar = 838383;
     }
 
     #[test]
-    fn test_return_statements() -> Result<(), Box<dyn std::error::Error>>{
+    fn test_return_statements(){
         let input = "
 return 5;
 return 10;
@@ -147,14 +149,16 @@ return 993322;
         let lexer = lexer::Lexer::new(&input);
         let mut parser = Parser::new(lexer);
 
-        let program = parser.parse_program()?;
+        let program = match parser.parse_program(){
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err)
+        };
 
         assert_eq!(program.statements.len(), 3);
 
         for i in 0..3{
             test_return_statement(&program.statements[i]);
         }
-        Ok(())
     }
 
     fn test_return_statement(statement: &ast::Statement){
