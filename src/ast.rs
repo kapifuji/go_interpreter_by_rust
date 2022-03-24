@@ -107,4 +107,20 @@ return x;
 
         assert_eq!(program.to_code(), expected_code);
     }
+
+    #[test]
+    fn test_to_code2() {
+        let expected_code = "!test;";
+        let mut program = Program::new();
+
+        let expression_id = Expression::Identifier("test".to_string());
+        let expression_prefix = Expression::PrefixExpression{
+            operator: operator::Prefix::Exclamation,
+            expression: Box::new(expression_id)};
+        let statement = Statement::Expression(expression_prefix);
+
+        program.statements.push(statement);
+
+        assert_eq!(program.to_code(), "!(test);\n");
+    }
 }
