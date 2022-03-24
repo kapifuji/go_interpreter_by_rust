@@ -56,12 +56,13 @@ impl<'a> Parser<'a> {
         };
 
         self.seek_token(); // Assign に進む
-
         self.expect_current(token::Token::Assign)?;
 
         self.seek_token(); // 式 に進む
-
         let expression = self.parse_expression()?;
+
+        self.seek_token(); // Semicolon に進む
+        self.expect_current(token::Token::Semicolon)?;
 
         Ok(ast::Statement::Let {
             identifier: identifier,
@@ -72,12 +73,20 @@ impl<'a> Parser<'a> {
     fn parse_return_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         self.seek_token(); // 式 に進む
         let expression = self.parse_expression()?;
+
+        self.seek_token(); // Semicolon に進む
+        self.expect_current(token::Token::Semicolon)?;
+
         Ok(ast::Statement::Return(expression))
     }
 
     fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>>{
         // 式文は文のトークンが無いのでここでseek不要
         let expression = self.parse_expression()?;
+
+        self.seek_token(); // Semicolon に進む
+        self.expect_current(token::Token::Semicolon)?;
+
         Ok(ast::Statement::Expression(expression))
     }
 
@@ -85,14 +94,14 @@ impl<'a> Parser<'a> {
         let expression = match self.current_token.clone(){
             token::Token::Identifier(identifier) => self.parse_identifier(identifier.as_str())?,
             token::Token::Integer(integer) => self.parse_integer(integer)?,
+            token::Token::Minus => self.parse_prefix_expression("-".to_string())?,
+            token::Token::Exclamation => self.parse_prefix_expression("!".to_string())?,
             other => {
                 println!("{:?}", other);
                 return Err(error::ParserError::UnImplementationParser("式のパーサーが未実装です。"))?
             }
         };
         
-        self.seek_token(); // Semicolon に進む
-        self.expect_current(token::Token::Semicolon)?;
         Ok(expression)
     }
 
@@ -102,6 +111,12 @@ impl<'a> Parser<'a> {
 
     fn parse_integer(&mut self, identifier: i32) -> Result<ast::Expression, Box<dyn std::error::Error>>{
         Ok(ast::Expression::Integer(identifier))
+    }
+
+    fn parse_prefix_expression(&mut self, operator: String) -> Result<ast::Expression, Box<dyn std::error::Error>>{
+        self.seek_token(); // prefix に係る 式 に進む
+        let expression = self.parse_expression()?;
+        Ok(ast::Expression::PrefixExpression{operator: operator, expression: Box::new(expression)})
     }
 
     fn expect_current(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
@@ -237,6 +252,10 @@ return 993322;
             panic!("expected ast::Statement::Expression, but got {:?}", statement);
         };
 
+        test_integer_literal(expression, 300);
+    }
+
+    fn test_integer_literal(expression: &ast::Expression, cmp_num: i32){
         let integer = if let ast::Expression::Integer(integer) = expression{
             integer
         }
@@ -244,6 +263,46 @@ return 993322;
             panic!("expected ast::Expression::Integer, but got {:?}", expression);
         };
 
-        assert_eq!(*integer, 300);
+        assert_eq!(*integer, cmp_num);
+    }
+
+    #[test]
+    fn test_prefix_expression() {
+        let input = "
+!5;
+-15;
+";
+        let result_ope = ["!", "-"];
+        let result_num = [5, 15];
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 2);
+
+        for i in 0..2{
+            let statement = &program.statements[i];
+
+            let expression = if let ast::Statement::Expression(expression) = statement{
+                expression
+            }
+            else{
+                panic!("expected ast::Statement::Expression, but got {:?}", statement);
+            };
+    
+            let (operator, expression) = if let ast::Expression::PrefixExpression{operator, expression} = expression{
+                (operator, expression)
+            }
+            else{
+                panic!("expected ast::Expression::Integer, but got {:?}", expression);
+            };
+    
+            assert_eq!(operator, result_ope[i]);
+            test_integer_literal(expression, result_num[i]);
+        }
     }
 }
