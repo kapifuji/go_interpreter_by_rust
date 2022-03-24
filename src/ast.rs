@@ -1,3 +1,5 @@
+use crate::operator;
+
 pub struct Program {
     pub statements: Vec<Statement>,
 }
@@ -18,7 +20,7 @@ pub enum Expression {
     Identifier(String),
     Integer(i32),
     PrefixExpression {
-        operator: String,
+        operator: operator::Prefix,
         expression: Box<Expression>,
     },
 }
@@ -72,7 +74,7 @@ impl Expression {
             Expression::PrefixExpression {
                 operator,
                 expression,
-            } => operator.to_string() + &expression.to_code(),
+            } => operator.to_code() + "(" + &expression.to_code() + ")",
             Expression::Illegal => "[illegal expression]".to_string(),
         }
     }

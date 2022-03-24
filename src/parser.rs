@@ -1,6 +1,7 @@
 use crate::ast;
 use crate::error;
 use crate::lexer;
+use crate::operator;
 use crate::token;
 
 struct Parser<'a> {
@@ -94,8 +95,10 @@ impl<'a> Parser<'a> {
         let expression = match self.current_token.clone() {
             token::Token::Identifier(identifier) => self.parse_identifier(identifier.as_str())?,
             token::Token::Integer(integer) => self.parse_integer(integer)?,
-            token::Token::Minus => self.parse_prefix_expression("-".to_string())?,
-            token::Token::Exclamation => self.parse_prefix_expression("!".to_string())?,
+            token::Token::Minus => self.parse_prefix_expression(operator::Prefix::Minus)?,
+            token::Token::Exclamation => {
+                self.parse_prefix_expression(operator::Prefix::Exclamation)?
+            }
             other => {
                 println!("{:?}", other);
                 return Err(error::ParserError::UnImplementationParser(
@@ -123,7 +126,7 @@ impl<'a> Parser<'a> {
 
     fn parse_prefix_expression(
         &mut self,
-        operator: String,
+        operator: operator::Prefix,
     ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         self.seek_token(); // prefix に係る 式 に進む
         let expression = self.parse_expression()?;
@@ -294,7 +297,7 @@ return 993322;
 !5;
 -15;
 ";
-        let result_ope = ["!", "-"];
+        let result_ope = [operator::Prefix::Exclamation, operator::Prefix::Minus];
         let result_num = [5, 15];
 
         let lexer = lexer::Lexer::new(input);
@@ -331,7 +334,7 @@ return 993322;
                 );
             };
 
-            assert_eq!(operator, result_ope[i]);
+            assert_eq!(*operator, result_ope[i]);
             test_integer_literal(expression, result_num[i]);
         }
     }
