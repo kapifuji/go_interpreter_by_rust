@@ -11,7 +11,7 @@ pub enum Token {
     Asterisk,           // *
     Slash,              // /
     LessThan,           // <
-    GraterThan,         // >
+    GreaterThan,         // >
     Equal,              // ==
     NotEqual,           // !=
     Comma,              // ,
