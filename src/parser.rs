@@ -41,7 +41,7 @@ impl<'a> Parser<'a> {
         match self.current_token {
             token::Token::Let => self.parse_let_statement(),
             token::Token::Return => self.parse_return_statement(),
-            _ => self.parse_expression_statement()
+            _ => self.parse_expression_statement(),
         }
     }
 
@@ -80,7 +80,7 @@ impl<'a> Parser<'a> {
         Ok(ast::Statement::Return(expression))
     }
 
-    fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>>{
+    fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         // 式文は文のトークンが無いのでここでseek不要
         let expression = self.parse_expression()?;
 
@@ -91,32 +91,46 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
-        let expression = match self.current_token.clone(){
+        let expression = match self.current_token.clone() {
             token::Token::Identifier(identifier) => self.parse_identifier(identifier.as_str())?,
             token::Token::Integer(integer) => self.parse_integer(integer)?,
             token::Token::Minus => self.parse_prefix_expression("-".to_string())?,
             token::Token::Exclamation => self.parse_prefix_expression("!".to_string())?,
             other => {
                 println!("{:?}", other);
-                return Err(error::ParserError::UnImplementationParser("式のパーサーが未実装です。"))?
+                return Err(error::ParserError::UnImplementationParser(
+                    "式のパーサーが未実装です。",
+                ))?;
             }
         };
-        
+
         Ok(expression)
     }
 
-    fn parse_identifier(&mut self, identifier: &str) -> Result<ast::Expression, Box<dyn std::error::Error>>{
+    fn parse_identifier(
+        &mut self,
+        identifier: &str,
+    ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         Ok(ast::Expression::Identifier(identifier.to_string()))
     }
 
-    fn parse_integer(&mut self, identifier: i32) -> Result<ast::Expression, Box<dyn std::error::Error>>{
+    fn parse_integer(
+        &mut self,
+        identifier: i32,
+    ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         Ok(ast::Expression::Integer(identifier))
     }
 
-    fn parse_prefix_expression(&mut self, operator: String) -> Result<ast::Expression, Box<dyn std::error::Error>>{
+    fn parse_prefix_expression(
+        &mut self,
+        operator: String,
+    ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         self.seek_token(); // prefix に係る 式 に進む
         let expression = self.parse_expression()?;
-        Ok(ast::Expression::PrefixExpression{operator: operator, expression: Box::new(expression)})
+        Ok(ast::Expression::PrefixExpression {
+            operator: operator,
+            expression: Box::new(expression),
+        })
     }
 
     fn expect_current(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
@@ -213,18 +227,22 @@ return 993322;
 
         let statement = &program.statements[0];
 
-        let expression = if let ast::Statement::Expression(expression) = statement{
+        let expression = if let ast::Statement::Expression(expression) = statement {
             expression
-        }
-        else{
-            panic!("expected ast::Statement::Expression, but got {:?}", statement);
+        } else {
+            panic!(
+                "expected ast::Statement::Expression, but got {:?}",
+                statement
+            );
         };
 
-        let identifier = if let ast::Expression::Identifier(identifier) = expression{
+        let identifier = if let ast::Expression::Identifier(identifier) = expression {
             identifier
-        }
-        else{
-            panic!("expected ast::Expression::Identifier, but got {:?}", expression);
+        } else {
+            panic!(
+                "expected ast::Expression::Identifier, but got {:?}",
+                expression
+            );
         };
 
         assert_eq!(identifier, "foobar");
@@ -245,22 +263,26 @@ return 993322;
 
         let statement = &program.statements[0];
 
-        let expression = if let ast::Statement::Expression(expression) = statement{
+        let expression = if let ast::Statement::Expression(expression) = statement {
             expression
-        }
-        else{
-            panic!("expected ast::Statement::Expression, but got {:?}", statement);
+        } else {
+            panic!(
+                "expected ast::Statement::Expression, but got {:?}",
+                statement
+            );
         };
 
         test_integer_literal(expression, 300);
     }
 
-    fn test_integer_literal(expression: &ast::Expression, cmp_num: i32){
-        let integer = if let ast::Expression::Integer(integer) = expression{
+    fn test_integer_literal(expression: &ast::Expression, cmp_num: i32) {
+        let integer = if let ast::Expression::Integer(integer) = expression {
             integer
-        }
-        else{
-            panic!("expected ast::Expression::Integer, but got {:?}", expression);
+        } else {
+            panic!(
+                "expected ast::Expression::Integer, but got {:?}",
+                expression
+            );
         };
 
         assert_eq!(*integer, cmp_num);
@@ -284,23 +306,31 @@ return 993322;
 
         assert_eq!(program.statements.len(), 2);
 
-        for i in 0..2{
+        for i in 0..2 {
             let statement = &program.statements[i];
 
-            let expression = if let ast::Statement::Expression(expression) = statement{
+            let expression = if let ast::Statement::Expression(expression) = statement {
                 expression
-            }
-            else{
-                panic!("expected ast::Statement::Expression, but got {:?}", statement);
+            } else {
+                panic!(
+                    "expected ast::Statement::Expression, but got {:?}",
+                    statement
+                );
             };
-    
-            let (operator, expression) = if let ast::Expression::PrefixExpression{operator, expression} = expression{
+
+            let (operator, expression) = if let ast::Expression::PrefixExpression {
+                operator,
+                expression,
+            } = expression
+            {
                 (operator, expression)
-            }
-            else{
-                panic!("expected ast::Expression::Integer, but got {:?}", expression);
+            } else {
+                panic!(
+                    "expected ast::Expression::Integer, but got {:?}",
+                    expression
+                );
             };
-    
+
             assert_eq!(operator, result_ope[i]);
             test_integer_literal(expression, result_num[i]);
         }

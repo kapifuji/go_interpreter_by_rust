@@ -17,10 +17,10 @@ pub enum Expression {
     Illegal,
     Identifier(String),
     Integer(i32),
-    PrefixExpression{
+    PrefixExpression {
         operator: String,
-        expression: Box<Expression>
-    }
+        expression: Box<Expression>,
+    },
 }
 
 impl Program {
@@ -69,7 +69,10 @@ impl Expression {
         match self {
             Expression::Identifier(identifier) => identifier.to_string(),
             Expression::Integer(integer) => integer.to_string(),
-            Expression::PrefixExpression{operator, expression} => operator.to_string() + &expression.to_code(),
+            Expression::PrefixExpression {
+                operator,
+                expression,
+            } => operator.to_string() + &expression.to_code(),
             Expression::Illegal => "[illegal expression]".to_string(),
         }
     }
