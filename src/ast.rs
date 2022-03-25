@@ -36,7 +36,7 @@ impl Program {
             statements: Vec::new(),
         }
     }
-    fn to_code(&self) -> String {
+    pub fn to_code(&self) -> String {
         let mut code = String::new();
         for statement in &self.statements {
             code.push_str(statement.to_code().as_str());

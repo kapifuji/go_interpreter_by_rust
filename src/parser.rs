@@ -60,7 +60,7 @@ impl<'a> Parser<'a> {
         self.expect_current(token::Token::Assign)?;
 
         self.seek_token(); // 式 に進む
-        let expression = self.parse_expression()?;
+        let expression = self.parse_expression(self.current_token.precedence())?;
 
         self.seek_token(); // Semicolon に進む
         self.expect_current(token::Token::Semicolon)?;
@@ -73,7 +73,7 @@ impl<'a> Parser<'a> {
 
     fn parse_return_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         self.seek_token(); // 式 に進む
-        let expression = self.parse_expression()?;
+        let expression = self.parse_expression(self.current_token.precedence())?;
 
         self.seek_token(); // Semicolon に進む
         self.expect_current(token::Token::Semicolon)?;
@@ -83,7 +83,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         // 式文は文のトークンが無いのでここでseek不要
-        let expression = self.parse_expression()?;
+        let expression = self.parse_expression(self.current_token.precedence())?;
 
         self.seek_token(); // Semicolon に進む
         self.expect_current(token::Token::Semicolon)?;
@@ -91,16 +91,19 @@ impl<'a> Parser<'a> {
         Ok(ast::Statement::Expression(expression))
     }
 
-    fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+    fn parse_expression(
+        &mut self,
+        precedence: operator::Precedences,
+    ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         let mut expression = match self.current_token.clone() {
             token::Token::Identifier(identifier) => self.parse_identifier(identifier.as_str())?,
             token::Token::Integer(integer) => self.parse_integer(integer)?,
             token::Token::Minus => {
-                self.seek_token(); // Prefix に進む
+                self.seek_token(); // Prefix の右辺式 に進む
                 self.parse_prefix_expression(operator::Prefix::Minus)?
             }
             token::Token::Exclamation => {
-                self.seek_token(); // Prefix に進む
+                self.seek_token(); // Prefix の右辺式 に進む
                 self.parse_prefix_expression(operator::Prefix::Exclamation)?
             }
             other => {
@@ -112,7 +115,7 @@ impl<'a> Parser<'a> {
         };
 
         while (self.next_token != token::Token::Semicolon)
-            && (self.current_token.precedence() < self.next_token.precedence())
+            && (precedence < self.next_token.precedence())
         {
             self.seek_token(); // Infix に進む
             expression = self.parse_infix_expression(expression.clone())?;
@@ -139,7 +142,7 @@ impl<'a> Parser<'a> {
         &mut self,
         operator: operator::Prefix,
     ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
-        let expression = self.parse_expression()?;
+        let expression = self.parse_expression(operator::Precedences::Prefix)?;
         Ok(ast::Expression::PrefixExpression {
             operator: operator,
             expression: Box::new(expression),
@@ -164,8 +167,9 @@ impl<'a> Parser<'a> {
             })?,
         };
 
+        let precedence = self.current_token.precedence(); // 中置演算子の優先度
         self.seek_token(); // infix の右辺式 に進む
-        let right = self.parse_expression()?;
+        let right = self.parse_expression(precedence)?;
 
         Ok(ast::Expression::InfixExpression {
             left: Box::new(left),
@@ -448,6 +452,43 @@ return 993322;
             test_integer_literal(expression_left, result_num[i]);
             assert_eq!(*operator, result_ope[i]);
             test_integer_literal(expression_right, result_num[i]);
+        }
+    }
+
+    #[test]
+    fn test_operator_precedence_parsing() {
+        let inputs = [
+            "a + b;",
+            "!-a;",
+            "a + b - c;",
+            "a * b / c;",
+            "a + b * c;",
+            "a + b * c + d / e - f;",
+            "1 + 2; -3 * 4;",
+            "5 > 4 == 3 < 4;",
+            "3 + 4 * 5 == 3 * 1 + 4 * 5;",
+        ];
+        let results = [
+            "(a + b);\n",
+            "(!(-a));\n",
+            "((a + b) - c);\n",
+            "((a * b) / c);\n",
+            "(a + (b * c));\n",
+            "(((a + (b * c)) + (d / e)) - f);\n",
+            "(1 + 2);\n((-3) * 4);\n",
+            "((5 > 4) == (3 < 4));\n",
+            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));\n",
+        ];
+
+        for (input, result) in inputs.iter().zip(results.iter()) {
+            let lexer = lexer::Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = match parser.parse_program() {
+                Ok(program) => program,
+                Err(err) => panic!("エラー: {}", err),
+            };
+
+            assert_eq!(result.to_string(), program.to_code());
         }
     }
 }
