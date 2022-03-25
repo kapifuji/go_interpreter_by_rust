@@ -92,11 +92,15 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
-        let expression = match self.current_token.clone() {
+        let mut expression = match self.current_token.clone() {
             token::Token::Identifier(identifier) => self.parse_identifier(identifier.as_str())?,
             token::Token::Integer(integer) => self.parse_integer(integer)?,
-            token::Token::Minus => self.parse_prefix_expression(operator::Prefix::Minus)?,
+            token::Token::Minus => {
+                self.seek_token(); // Prefix に進む
+                self.parse_prefix_expression(operator::Prefix::Minus)?
+            }
             token::Token::Exclamation => {
+                self.seek_token(); // Prefix に進む
                 self.parse_prefix_expression(operator::Prefix::Exclamation)?
             }
             other => {
@@ -106,6 +110,13 @@ impl<'a> Parser<'a> {
                 ))?;
             }
         };
+
+        while (self.next_token != token::Token::Semicolon)
+            && (self.current_token.precedence() < self.next_token.precedence())
+        {
+            self.seek_token(); // Infix に進む
+            expression = self.parse_infix_expression(expression.clone())?;
+        }
 
         Ok(expression)
     }
@@ -128,11 +139,38 @@ impl<'a> Parser<'a> {
         &mut self,
         operator: operator::Prefix,
     ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
-        self.seek_token(); // prefix に係る 式 に進む
         let expression = self.parse_expression()?;
         Ok(ast::Expression::PrefixExpression {
             operator: operator,
             expression: Box::new(expression),
+        })
+    }
+
+    fn parse_infix_expression(
+        &mut self,
+        left: ast::Expression,
+    ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        let infix = match self.current_token {
+            token::Token::Plus => operator::Infix::Plus,
+            token::Token::Minus => operator::Infix::Minus,
+            token::Token::Asterisk => operator::Infix::Asterisk,
+            token::Token::Slash => operator::Infix::Slash,
+            token::Token::LessThan => operator::Infix::LessThan,
+            token::Token::GreaterThan => operator::Infix::GreaterThan,
+            token::Token::Equal => operator::Infix::Equal,
+            token::Token::NotEqual => operator::Infix::NotEqual,
+            _ => Err(error::ParserError::NotFoundInfixToken {
+                found_token: self.current_token.clone(),
+            })?,
+        };
+
+        self.seek_token(); // infix の右辺式 に進む
+        let right = self.parse_expression()?;
+
+        Ok(ast::Expression::InfixExpression {
+            left: Box::new(left),
+            operator: infix,
+            right: Box::new(right),
         })
     }
 
@@ -145,6 +183,14 @@ impl<'a> Parser<'a> {
                 expected_token: token,
             })?
         }
+    }
+
+    fn check_current_token(&self, token: token::Token) -> bool {
+        self.current_token == token
+    }
+
+    fn check_next_token(&self, token: token::Token) -> bool {
+        self.next_token == token
     }
 }
 
@@ -321,7 +367,7 @@ return 993322;
                 );
             };
 
-            let (operator, expression) = if let ast::Expression::PrefixExpression {
+            let (operator, expression_right) = if let ast::Expression::PrefixExpression {
                 operator,
                 expression,
             } = expression
@@ -329,13 +375,79 @@ return 993322;
                 (operator, expression)
             } else {
                 panic!(
-                    "expected ast::Expression::Integer, but got {:?}",
+                    "expected ast::Expression::PrefixExpression, but got {:?}",
                     expression
                 );
             };
 
             assert_eq!(*operator, result_ope[i]);
-            test_integer_literal(expression, result_num[i]);
+            test_integer_literal(expression_right, result_num[i]);
+        }
+    }
+
+    #[test]
+    fn test_infix_expression() {
+        let input = "
+1 + 1;
+2 - 2;
+3 * 3;
+4 / 4;
+5 < 5;
+6 > 6;
+7 == 7;
+8 != 8;
+";
+        let result_ope = [
+            operator::Infix::Plus,
+            operator::Infix::Minus,
+            operator::Infix::Asterisk,
+            operator::Infix::Slash,
+            operator::Infix::LessThan,
+            operator::Infix::GreaterThan,
+            operator::Infix::Equal,
+            operator::Infix::NotEqual,
+        ];
+        let result_num = [1, 2, 3, 4, 5, 6, 7, 8];
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 8);
+
+        for i in 0..8 {
+            let statement = &program.statements[i];
+
+            let expression = if let ast::Statement::Expression(expression) = statement {
+                expression
+            } else {
+                panic!(
+                    "expected ast::Statement::Expression, but got {:?}",
+                    statement
+                );
+            };
+
+            let (expression_left, operator, expression_right) =
+                if let ast::Expression::InfixExpression {
+                    left,
+                    operator,
+                    right,
+                } = expression
+                {
+                    (left, operator, right)
+                } else {
+                    panic!(
+                        "expected ast::Expression::InfixExpression, but got {:?}",
+                        expression
+                    );
+                };
+
+            test_integer_literal(expression_left, result_num[i]);
+            assert_eq!(*operator, result_ope[i]);
+            test_integer_literal(expression_right, result_num[i]);
         }
     }
 }

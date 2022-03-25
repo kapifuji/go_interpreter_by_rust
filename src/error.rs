@@ -7,6 +7,9 @@ pub enum ParserError<'a> {
         actual_token: token::Token,
         expected_token: token::Token,
     },
+    NotFoundInfixToken {
+        found_token: token::Token,
+    },
     NotFoundLetIdentifier {
         found_token: token::Token,
     },
@@ -26,6 +29,9 @@ impl<'a> std::fmt::Display for ParserError<'a> {
                     "({:?}を期待しましたが、{:?}でした。)",
                     expected_token, actual_token
                 )
+            }
+            self::ParserError::NotFoundInfixToken { found_token } => {
+                write!(f, "(Infixを期待しましたが、{:?}でした。)", found_token)
             }
             self::ParserError::NotFoundLetIdentifier { found_token } => {
                 write!(f, "(Identifierを期待しましたが、{:?}でした。)", found_token)

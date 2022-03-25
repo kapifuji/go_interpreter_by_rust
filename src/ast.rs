@@ -14,7 +14,7 @@ pub enum Statement {
     Expression(Expression),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Illegal,
     Identifier(String),
@@ -22,6 +22,11 @@ pub enum Expression {
     PrefixExpression {
         operator: operator::Prefix,
         expression: Box<Expression>,
+    },
+    InfixExpression {
+        left: Box<Expression>,
+        operator: operator::Infix,
+        right: Box<Expression>,
     },
 }
 
@@ -74,7 +79,20 @@ impl Expression {
             Expression::PrefixExpression {
                 operator,
                 expression,
-            } => operator.to_code() + "(" + &expression.to_code() + ")",
+            } => "(".to_string() + &operator.to_code() + &expression.to_code() + ")",
+            Expression::InfixExpression {
+                left,
+                operator,
+                right,
+            } => {
+                "(".to_string()
+                    + &left.to_code()
+                    + " "
+                    + &operator.to_code()
+                    + " "
+                    + &right.to_code()
+                    + ")"
+            }
             Expression::Illegal => "[illegal expression]".to_string(),
         }
     }
@@ -109,18 +127,38 @@ return x;
     }
 
     #[test]
-    fn test_to_code2() {
+    fn test_to_code_prefix() {
         let expected_code = "!test;";
         let mut program = Program::new();
 
         let expression_id = Expression::Identifier("test".to_string());
-        let expression_prefix = Expression::PrefixExpression{
+        let expression_prefix = Expression::PrefixExpression {
             operator: operator::Prefix::Exclamation,
-            expression: Box::new(expression_id)};
+            expression: Box::new(expression_id),
+        };
         let statement = Statement::Expression(expression_prefix);
 
         program.statements.push(statement);
 
-        assert_eq!(program.to_code(), "!(test);\n");
+        assert_eq!(program.to_code(), "(!test);\n");
+    }
+
+    #[test]
+    fn test_to_code_infix() {
+        let expected_code = "2 * test;";
+        let mut program = Program::new();
+
+        let expression_l = Expression::Integer(2);
+        let expression_r = Expression::Identifier("test".to_string());
+        let expression_prefix = Expression::InfixExpression {
+            left: Box::new(expression_l),
+            operator: operator::Infix::Asterisk,
+            right: Box::new(expression_r),
+        };
+        let statement = Statement::Expression(expression_prefix);
+
+        program.statements.push(statement);
+
+        assert_eq!(program.to_code(), "(2 * test);\n");
     }
 }
