@@ -289,16 +289,7 @@ return 993322;
             );
         };
 
-        let identifier = if let ast::Expression::Identifier(identifier) = expression {
-            identifier
-        } else {
-            panic!(
-                "expected ast::Expression::Identifier, but got {:?}",
-                expression
-            );
-        };
-
-        assert_eq!(identifier, "foobar");
+        test_identifier_literal(expression, "foobar".to_string());
     }
 
     #[test]
@@ -339,6 +330,19 @@ return 993322;
         };
 
         assert_eq!(*integer, cmp_num);
+    }
+
+    fn test_identifier_literal(expression: &ast::Expression, cmp_num: String) {
+        let identifier = if let ast::Expression::Identifier(identifier) = expression {
+            identifier
+        } else {
+            panic!(
+                "expected ast::Expression::Identifier, but got {:?}",
+                expression
+            );
+        };
+
+        assert_eq!(*identifier, cmp_num);
     }
 
     #[test]
