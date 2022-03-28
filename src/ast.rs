@@ -133,7 +133,7 @@ return x;
 
     #[test]
     fn test_to_code_prefix() {
-        let expected_code = "!test;";
+        let expected_code = "(!test);\n";
         let mut program = Program::new();
 
         let expression_id = Expression::Identifier("test".to_string());
@@ -145,12 +145,12 @@ return x;
 
         program.statements.push(statement);
 
-        assert_eq!(program.to_code(), "(!test);\n");
+        assert_eq!(program.to_code(), expected_code);
     }
 
     #[test]
     fn test_to_code_infix() {
-        let expected_code = "2 * test;";
+        let expected_code = "(2 * test);\n";
         let mut program = Program::new();
 
         let expression_l = Expression::Integer(2);
@@ -164,6 +164,6 @@ return x;
 
         program.statements.push(statement);
 
-        assert_eq!(program.to_code(), "(2 * test);\n");
+        assert_eq!(program.to_code(), expected_code);
     }
 }

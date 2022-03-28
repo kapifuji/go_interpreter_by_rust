@@ -218,7 +218,7 @@ let x = 5;
 let y = 5;
 let foobar = 838383;
 ";
-        let results = vec!["x", "y", "foobar"];
+        let results = ["x", "y", "foobar"];
 
         let lexer = lexer::Lexer::new(&input);
         let mut parser = Parser::new(lexer);
@@ -389,24 +389,22 @@ return 993322;
 
     #[test]
     fn test_prefix_expression() {
-        let input = "
-!5;
--15;
-";
-        let result_ope = [operator::Prefix::Exclamation, operator::Prefix::Minus];
-        let result_num = [5, 15];
+        let problem = [
+            ("!5;", operator::Prefix::Exclamation, 5),
+            ("-15;", operator::Prefix::Minus, 15),
+        ];
 
-        let lexer = lexer::Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = match parser.parse_program() {
-            Ok(program) => program,
-            Err(err) => panic!("エラー: {}", err),
-        };
+        for (input, result_op, result_r) in problem {
+            let lexer = lexer::Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = match parser.parse_program() {
+                Ok(program) => program,
+                Err(err) => panic!("エラー: {}", err),
+            };
 
-        assert_eq!(program.statements.len(), 2);
+            assert_eq!(program.statements.len(), 1);
 
-        for i in 0..2 {
-            let statement = &program.statements[i];
+            let statement = &program.statements[0];
 
             let expression = test_expression_statement(statement);
 
@@ -423,46 +421,35 @@ return 993322;
                 );
             };
 
-            assert_eq!(operator, result_ope[i]);
-            test_integer_literal(&expression_right, result_num[i]);
+            assert_eq!(operator, result_op);
+            test_integer_literal(&expression_right, result_r);
         }
     }
 
     #[test]
     fn test_infix_expression() {
-        let input = "
-1 + 1;
-2 - 2;
-3 * 3;
-4 / 4;
-5 < 5;
-6 > 6;
-7 == 7;
-8 != 8;
-";
-        let result_ope = [
-            operator::Infix::Plus,
-            operator::Infix::Minus,
-            operator::Infix::Asterisk,
-            operator::Infix::Slash,
-            operator::Infix::LessThan,
-            operator::Infix::GreaterThan,
-            operator::Infix::Equal,
-            operator::Infix::NotEqual,
+        let problem = [
+            ("1 + 2;", 1, operator::Infix::Plus, 2),
+            ("2 - 3;", 2, operator::Infix::Minus, 3),
+            ("3 * 4;", 3, operator::Infix::Asterisk, 4),
+            ("4 / 5;", 4, operator::Infix::Slash, 5),
+            ("5 < 6;", 5, operator::Infix::LessThan, 6),
+            ("6 > 7;", 6, operator::Infix::GreaterThan, 7),
+            ("7 == 8;", 7, operator::Infix::Equal, 8),
+            ("8 != 9;", 8, operator::Infix::NotEqual, 9),
         ];
-        let result_num = [1, 2, 3, 4, 5, 6, 7, 8];
 
-        let lexer = lexer::Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let program = match parser.parse_program() {
-            Ok(program) => program,
-            Err(err) => panic!("エラー: {}", err),
-        };
+        for (input, result_l, result_op, result_r) in problem {
+            let lexer = lexer::Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = match parser.parse_program() {
+                Ok(program) => program,
+                Err(err) => panic!("エラー: {}", err),
+            };
 
-        assert_eq!(program.statements.len(), 8);
+            assert_eq!(program.statements.len(), 1);
 
-        for i in 0..8 {
-            let statement = &program.statements[i];
+            let statement = &program.statements[0];
 
             let expression = test_expression_statement(statement);
 
@@ -481,44 +468,36 @@ return 993322;
                     );
                 };
 
-            test_integer_literal(&expression_left, result_num[i]);
-            assert_eq!(operator, result_ope[i]);
-            test_integer_literal(&expression_right, result_num[i]);
+            test_integer_literal(&expression_left, result_l);
+            assert_eq!(operator, result_op);
+            test_integer_literal(&expression_right, result_r);
         }
     }
 
     #[test]
     fn test_operator_precedence_parsing() {
-        let inputs = [
-            "a + b;",
-            "!-a;",
-            "a + b - c;",
-            "a * b / c;",
-            "a + b * c;",
-            "a + b * c + d / e - f;",
-            "1 + 2; -3 * 4;",
-            "5 > 4 == 3 < 4;",
-            "3 + 4 * 5 == 3 * 1 + 4 * 5;",
-            "true;",
-            "true == false;",
-            "1 > 2 == false;",
-        ];
-        let results = [
-            "(a + b);\n",
-            "(!(-a));\n",
-            "((a + b) - c);\n",
-            "((a * b) / c);\n",
-            "(a + (b * c));\n",
-            "(((a + (b * c)) + (d / e)) - f);\n",
-            "(1 + 2);\n((-3) * 4);\n",
-            "((5 > 4) == (3 < 4));\n",
-            "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));\n",
-            "true;\n",
-            "(true == false);\n",
-            "((1 > 2) == false);\n",
+        let problem = [
+            ("a + b;", "(a + b);\n"),
+            ("!-a;", "(!(-a));\n"),
+            ("a + b - c;", "((a + b) - c);\n"),
+            ("a * b / c;", "((a * b) / c);\n"),
+            ("a + b * c;", "(a + (b * c));\n"),
+            (
+                "a + b * c + d / e - f;",
+                "(((a + (b * c)) + (d / e)) - f);\n",
+            ),
+            ("1 + 2; -3 * 4;", "(1 + 2);\n((-3) * 4);\n"),
+            ("5 > 4 == 3 < 4;", "((5 > 4) == (3 < 4));\n"),
+            (
+                "3 + 4 * 5 == 3 * 1 + 4 * 5;",
+                "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));\n",
+            ),
+            ("true;", "true;\n"),
+            ("true == false;", "(true == false);\n"),
+            ("1 > 2 == false;", "((1 > 2) == false);\n"),
         ];
 
-        for (input, result) in inputs.iter().zip(results.iter()) {
+        for (input, result) in problem {
             let lexer = lexer::Lexer::new(input);
             let mut parser = Parser::new(lexer);
             let program = match parser.parse_program() {
