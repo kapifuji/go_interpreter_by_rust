@@ -209,6 +209,8 @@ let x = 5;
 let y = 5;
 let foobar = 838383;
 ";
+        let results = vec!["x", "y", "foobar"];
+
         let lexer = lexer::Lexer::new(&input);
         let mut parser = Parser::new(lexer);
 
@@ -219,9 +221,7 @@ let foobar = 838383;
 
         assert_eq!(program.statements.len(), 3);
 
-        let tests = vec!["x", "y", "foobar"];
-
-        for (i, test) in tests.iter().enumerate() {
+        for (i, test) in results.iter().enumerate() {
             test_let_statement(&program.statements[i], test);
         }
     }
@@ -280,16 +280,9 @@ return 993322;
 
         let statement = &program.statements[0];
 
-        let expression = if let ast::Statement::Expression(expression) = statement {
-            expression
-        } else {
-            panic!(
-                "expected ast::Statement::Expression, but got {:?}",
-                statement
-            );
-        };
+        let expression = test_expression_statement(statement);
 
-        test_identifier_literal(expression, "foobar".to_string());
+        test_identifier_literal(&expression, "foobar".to_string());
     }
 
     #[test]
@@ -307,16 +300,20 @@ return 993322;
 
         let statement = &program.statements[0];
 
-        let expression = if let ast::Statement::Expression(expression) = statement {
-            expression
+        let expression = test_expression_statement(statement);
+
+        test_integer_literal(&expression, 300);
+    }
+
+    fn test_expression_statement(statement: &ast::Statement) -> ast::Expression {
+        if let ast::Statement::Expression(expression) = statement {
+            expression.clone()
         } else {
             panic!(
                 "expected ast::Statement::Expression, but got {:?}",
                 statement
             );
-        };
-
-        test_integer_literal(expression, 300);
+        }
     }
 
     fn test_integer_literal(expression: &ast::Expression, cmp_num: i32) {
@@ -366,14 +363,7 @@ return 993322;
         for i in 0..2 {
             let statement = &program.statements[i];
 
-            let expression = if let ast::Statement::Expression(expression) = statement {
-                expression
-            } else {
-                panic!(
-                    "expected ast::Statement::Expression, but got {:?}",
-                    statement
-                );
-            };
+            let expression = test_expression_statement(statement);
 
             let (operator, expression_right) = if let ast::Expression::PrefixExpression {
                 operator,
@@ -388,8 +378,8 @@ return 993322;
                 );
             };
 
-            assert_eq!(*operator, result_ope[i]);
-            test_integer_literal(expression_right, result_num[i]);
+            assert_eq!(operator, result_ope[i]);
+            test_integer_literal(&expression_right, result_num[i]);
         }
     }
 
@@ -429,14 +419,7 @@ return 993322;
         for i in 0..8 {
             let statement = &program.statements[i];
 
-            let expression = if let ast::Statement::Expression(expression) = statement {
-                expression
-            } else {
-                panic!(
-                    "expected ast::Statement::Expression, but got {:?}",
-                    statement
-                );
-            };
+            let expression = test_expression_statement(statement);
 
             let (expression_left, operator, expression_right) =
                 if let ast::Expression::InfixExpression {
@@ -453,9 +436,9 @@ return 993322;
                     );
                 };
 
-            test_integer_literal(expression_left, result_num[i]);
-            assert_eq!(*operator, result_ope[i]);
-            test_integer_literal(expression_right, result_num[i]);
+            test_integer_literal(&expression_left, result_num[i]);
+            assert_eq!(operator, result_ope[i]);
+            test_integer_literal(&expression_right, result_num[i]);
         }
     }
 
