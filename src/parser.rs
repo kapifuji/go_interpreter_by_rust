@@ -370,7 +370,7 @@ return 993322;
             boolean
         } else {
             panic!(
-                "expected ast::Expression::Identifier, but got {:?}",
+                "expected ast::Expression::Boolean, but got {:?}",
                 expression
             );
         };
