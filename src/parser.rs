@@ -108,6 +108,7 @@ impl<'a> Parser<'a> {
             }
             token::Token::True => self.parse_boolean(true)?,
             token::Token::False => self.parse_boolean(false)?,
+            token::Token::Lparentheses => self.parse_grouped_expression()?,
             other => {
                 println!("{:?}", other);
                 return Err(error::ParserError::UnImplementationParser(
@@ -185,6 +186,16 @@ impl<'a> Parser<'a> {
             operator: infix,
             right: Box::new(right),
         })
+    }
+
+    fn parse_grouped_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        self.seek_token(); // 式 に進む
+        let expression = self.parse_expression(self.current_token.precedence())?;
+
+        self.seek_token(); // Rparentheses に進む
+        self.expect_current(token::Token::Rparentheses)?;
+
+        Ok(expression)
     }
 
     fn expect_current(&mut self, token: token::Token) -> Result<(), Box<dyn std::error::Error>> {
@@ -495,6 +506,12 @@ return 993322;
             ("true;", "true;\n"),
             ("true == false;", "(true == false);\n"),
             ("1 > 2 == false;", "((1 > 2) == false);\n"),
+            ("(1 + 2) * 3;", "((1 + 2) * 3);\n"),
+            ("1 + (2 - 3);", "(1 + (2 - 3));\n"),
+            ("-(1 + 2);", "(-(1 + 2));\n"),
+            ("!(true == true);", "(!(true == true));\n"),
+            ("1 + (2 - 3) * 4;", "(1 + ((2 - 3) * 4));\n"),
+            ("(1 + -(2 + 3)) * 4;", "((1 + (-(2 + 3))) * 4);\n"),
         ];
 
         for (input, result) in problem {
