@@ -106,6 +106,8 @@ impl<'a> Parser<'a> {
                 self.seek_token(); // Prefix の右辺式 に進む
                 self.parse_prefix_expression(operator::Prefix::Exclamation)?
             }
+            token::Token::True => self.parse_boolean(true)?,
+            token::Token::False => self.parse_boolean(false)?,
             other => {
                 println!("{:?}", other);
                 return Err(error::ParserError::UnImplementationParser(
@@ -136,6 +138,13 @@ impl<'a> Parser<'a> {
         identifier: i32,
     ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         Ok(ast::Expression::Integer(identifier))
+    }
+
+    fn parse_boolean(
+        &mut self,
+        boolean: bool,
+    ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        Ok(ast::Expression::Boolean(boolean))
     }
 
     fn parse_prefix_expression(
@@ -310,20 +319,20 @@ return 993322;
         let inputs = ["true;", "false;"];
         let results = [true, false];
 
-        for (input, result) in inputs.iter().zip(results.iter()){
+        for (input, result) in inputs.iter().zip(results.iter()) {
             let lexer = lexer::Lexer::new(input);
             let mut parser = Parser::new(lexer);
             let program = match parser.parse_program() {
                 Ok(program) => program,
                 Err(err) => panic!("エラー: {}", err),
             };
-    
+
             assert_eq!(program.statements.len(), 1);
-    
+
             let statement = &program.statements[0];
-    
+
             let expression = test_expression_statement(statement);
-    
+
             test_boolean_literal(&expression, *result);
         }
     }
@@ -364,7 +373,7 @@ return 993322;
 
         assert_eq!(*identifier, cmp_num);
     }
-    
+
     fn test_boolean_literal(expression: &ast::Expression, cmp_bool: bool) {
         let boolean = if let ast::Expression::Boolean(boolean) = expression {
             boolean
@@ -490,6 +499,9 @@ return 993322;
             "1 + 2; -3 * 4;",
             "5 > 4 == 3 < 4;",
             "3 + 4 * 5 == 3 * 1 + 4 * 5;",
+            "true;",
+            "true == false;",
+            "1 > 2 == false;",
         ];
         let results = [
             "(a + b);\n",
@@ -501,6 +513,9 @@ return 993322;
             "(1 + 2);\n((-3) * 4);\n",
             "((5 > 4) == (3 < 4));\n",
             "((3 + (4 * 5)) == ((3 * 1) + (4 * 5)));\n",
+            "true;\n",
+            "(true == false);\n",
+            "((1 > 2) == false);\n",
         ];
 
         for (input, result) in inputs.iter().zip(results.iter()) {
