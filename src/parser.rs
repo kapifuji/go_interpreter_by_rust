@@ -305,6 +305,29 @@ return 993322;
         test_integer_literal(&expression, 300);
     }
 
+    #[test]
+    fn test_boolean_expression() {
+        let inputs = ["true;", "false;"];
+        let results = [true, false];
+
+        for (input, result) in inputs.iter().zip(results.iter()){
+            let lexer = lexer::Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = match parser.parse_program() {
+                Ok(program) => program,
+                Err(err) => panic!("エラー: {}", err),
+            };
+    
+            assert_eq!(program.statements.len(), 1);
+    
+            let statement = &program.statements[0];
+    
+            let expression = test_expression_statement(statement);
+    
+            test_boolean_literal(&expression, *result);
+        }
+    }
+
     fn test_expression_statement(statement: &ast::Statement) -> ast::Expression {
         if let ast::Statement::Expression(expression) = statement {
             expression.clone()
@@ -340,6 +363,19 @@ return 993322;
         };
 
         assert_eq!(*identifier, cmp_num);
+    }
+    
+    fn test_boolean_literal(expression: &ast::Expression, cmp_bool: bool) {
+        let boolean = if let ast::Expression::Boolean(boolean) = expression {
+            boolean
+        } else {
+            panic!(
+                "expected ast::Expression::Identifier, but got {:?}",
+                expression
+            );
+        };
+
+        assert_eq!(*boolean, cmp_bool);
     }
 
     #[test]

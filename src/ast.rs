@@ -19,6 +19,7 @@ pub enum Expression {
     Illegal,
     Identifier(String),
     Integer(i32),
+    Boolean(bool),
     PrefixExpression {
         operator: operator::Prefix,
         expression: Box<Expression>,
@@ -76,6 +77,10 @@ impl Expression {
         match self {
             Expression::Identifier(identifier) => identifier.to_string(),
             Expression::Integer(integer) => integer.to_string(),
+            Expression::Boolean(boolean) => match boolean {
+                true => "true".to_string(),
+                false => "false".to_string(),
+            },
             Expression::PrefixExpression {
                 operator,
                 expression,
