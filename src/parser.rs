@@ -38,6 +38,21 @@ impl<'a> Parser<'a> {
         Ok(program)
     }
 
+    fn parse_block_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
+        let mut statements: Vec<ast::Statement> = Vec::new();
+
+        self.seek_token(); // Block内の文 に進む
+        while (self.current_token != token::Token::Rbrace)
+            && (self.current_token != token::Token::EndOfFile)
+        {
+            let statement = self.parse_statement()?;
+            statements.push(statement);
+            self.seek_token(); // 次の文 に進む
+        }
+
+        Ok(ast::Statement::Block(statements))
+    }
+
     fn parse_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         match self.current_token {
             token::Token::Let => self.parse_let_statement(),
@@ -85,8 +100,10 @@ impl<'a> Parser<'a> {
         // 式文は文のトークンが無いのでここでseek不要
         let expression = self.parse_expression(self.current_token.precedence())?;
 
-        self.seek_token(); // Semicolon に進む
-        self.expect_current(token::Token::Semicolon)?;
+        if self.next_token == token::Token::Semicolon {
+            // 式文では Semicolonは省略可能
+            self.seek_token(); // Semicolon に進む
+        }
 
         Ok(ast::Statement::Expression(expression))
     }
@@ -109,6 +126,7 @@ impl<'a> Parser<'a> {
             token::Token::True => self.parse_boolean(true)?,
             token::Token::False => self.parse_boolean(false)?,
             token::Token::Lparentheses => self.parse_grouped_expression()?,
+            token::Token::If => self.parse_if_expression()?,
             other => {
                 println!("{:?}", other);
                 return Err(error::ParserError::UnImplementationParser(
@@ -185,6 +203,38 @@ impl<'a> Parser<'a> {
             left: Box::new(left),
             operator: infix,
             right: Box::new(right),
+        })
+    }
+
+    fn parse_if_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        self.seek_token(); // Lparentheses に進む
+        self.expect_current(token::Token::Lparentheses)?;
+
+        self.seek_token(); // 条件式 に進む
+        let condition = self.parse_expression(self.current_token.precedence())?;
+
+        self.seek_token(); // Rparentheses に進む
+        self.expect_current(token::Token::Rparentheses)?;
+
+        self.seek_token(); // Lbrace に進む
+        self.expect_current(token::Token::Lbrace)?;
+        let consequence = self.parse_block_statement()?;
+
+        let alternative = if self.next_token == token::Token::Else {
+            self.seek_token(); // else に進む
+
+            self.seek_token(); // Lbrace に進む
+            self.expect_current(token::Token::Lbrace)?;
+
+            Some(Box::new(self.parse_block_statement()?))
+        } else {
+            None
+        };
+
+        Ok(ast::Expression::IfExpression {
+            condition: Box::new(condition),
+            consequence: Box::new(consequence),
+            alternative: alternative,
         })
     }
 
@@ -483,6 +533,181 @@ return 993322;
             assert_eq!(operator, result_op);
             test_integer_literal(&expression_right, result_r);
         }
+    }
+
+    #[test]
+    fn test_if_expression() {
+        let input = "if (x < y) { x; }";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+
+        let expression = test_expression_statement(statement);
+
+        // if式 確認
+        let (condition, consequence, alternative) = if let ast::Expression::IfExpression {
+            condition,
+            consequence,
+            alternative,
+        } = expression
+        {
+            (condition, consequence, alternative)
+        } else {
+            panic!(
+                "expected ast::Expression::IfExpression, but got {:?}",
+                expression
+            );
+        };
+
+        // condition 確認
+        let (expression_left, operator, expression_right) =
+            if let ast::Expression::InfixExpression {
+                left,
+                operator,
+                right,
+            } = *condition
+            {
+                (left, operator, right)
+            } else {
+                panic!(
+                    "expected ast::Expression::InfixExpression, but got {:?}",
+                    condition
+                );
+            };
+
+        test_identifier_literal(&expression_left, "x".to_string());
+        assert_eq!(operator, operator::Infix::LessThan);
+        test_identifier_literal(&expression_right, "y".to_string());
+
+        // consequence 確認
+        let statement = if let ast::Statement::Block(statements) = *consequence {
+            assert_eq!(statements.len(), 1);
+            statements[0].clone()
+        } else {
+            panic!("expected ast::Statement::Block, but got {:?}", consequence);
+        };
+
+        let expression = if let ast::Statement::Expression(expression) = statement {
+            expression
+        } else {
+            panic!(
+                "expected ast::Statement::Expression, but got {:?}",
+                statement
+            );
+        };
+
+        test_identifier_literal(&expression, "x".to_string());
+
+        // alternative 確認
+        if let None = alternative {
+        } else {
+            panic!("expected None, but got {:?}", alternative);
+        }
+    }
+
+    #[test]
+    fn test_if_else_expression() {
+        let input = "if (x < y) { x; } else { y; }";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+
+        let expression = test_expression_statement(statement);
+
+        // if式 確認
+        let (condition, consequence, alternative) = if let ast::Expression::IfExpression {
+            condition,
+            consequence,
+            alternative,
+        } = expression
+        {
+            (condition, consequence, alternative)
+        } else {
+            panic!(
+                "expected ast::Expression::IfExpression, but got {:?}",
+                expression
+            );
+        };
+
+        // condition 確認
+        let (expression_left, operator, expression_right) =
+            if let ast::Expression::InfixExpression {
+                left,
+                operator,
+                right,
+            } = *condition
+            {
+                (left, operator, right)
+            } else {
+                panic!(
+                    "expected ast::Expression::InfixExpression, but got {:?}",
+                    condition
+                );
+            };
+
+        test_identifier_literal(&expression_left, "x".to_string());
+        assert_eq!(operator, operator::Infix::LessThan);
+        test_identifier_literal(&expression_right, "y".to_string());
+
+        // consequence 確認
+        let statement = if let ast::Statement::Block(statements) = *consequence {
+            assert_eq!(statements.len(), 1);
+            statements[0].clone()
+        } else {
+            panic!("expected ast::Statement::Block, but got {:?}", consequence);
+        };
+
+        let expression = if let ast::Statement::Expression(expression) = statement {
+            expression
+        } else {
+            panic!(
+                "expected ast::Statement::Expression, but got {:?}",
+                statement
+            );
+        };
+
+        test_identifier_literal(&expression, "x".to_string());
+
+        // alternative 確認
+        let alternative = if let Some(alternative) = alternative {
+            alternative
+        } else {
+            panic!("expected alternative");
+        };
+
+        let statement = if let ast::Statement::Block(statements) = *alternative {
+            assert_eq!(statements.len(), 1);
+            statements[0].clone()
+        } else {
+            panic!("expected ast::Statement::Block, but got {:?}", alternative);
+        };
+
+        let expression = if let ast::Statement::Expression(expression) = statement {
+            expression
+        } else {
+            panic!(
+                "expected ast::Statement::Expression, but got {:?}",
+                statement
+            );
+        };
+
+        test_identifier_literal(&expression, "y".to_string());
     }
 
     #[test]

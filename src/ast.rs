@@ -4,7 +4,7 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Statement {
     Let {
         identifier: Expression,
@@ -12,6 +12,7 @@ pub enum Statement {
     },
     Return(Expression),
     Expression(Expression),
+    Block(Vec<Statement>),
 }
 
 #[derive(Debug, Clone)]
@@ -28,6 +29,11 @@ pub enum Expression {
         left: Box<Expression>,
         operator: operator::Infix,
         right: Box<Expression>,
+    },
+    IfExpression {
+        condition: Box<Expression>,
+        consequence: Box<Statement>,
+        alternative: Option<Box<Statement>>,
     },
 }
 
@@ -49,26 +55,33 @@ impl Program {
 
 impl Statement {
     fn to_code(&self) -> String {
-        let mut statement = String::new();
+        let mut code = "".to_string();
         match self {
             Statement::Let { identifier, value } => {
-                statement.push_str("let ");
-                statement.push_str(identifier.to_code().as_str());
-                statement.push_str(" = ");
-                statement.push_str(value.to_code().as_str());
-                statement.push(';');
+                code.push_str("let ");
+                code.push_str(identifier.to_code().as_str());
+                code.push_str(" = ");
+                code.push_str(value.to_code().as_str());
+                code.push(';');
             }
             Statement::Return(expression) => {
-                statement.push_str("return ");
-                statement.push_str(expression.to_code().as_str());
-                statement.push(';');
+                code.push_str("return ");
+                code.push_str(expression.to_code().as_str());
+                code.push(';');
             }
             Statement::Expression(expression) => {
-                statement.push_str(expression.to_code().as_str());
-                statement.push(';');
+                code.push_str(expression.to_code().as_str());
+                code.push(';');
+            }
+            Statement::Block(statements) => {
+                code.push('{');
+                for statement in statements {
+                    code.push_str(statement.to_code().as_str());
+                }
+                code.push('}');
             }
         }
-        statement
+        code
     }
 }
 
@@ -97,6 +110,23 @@ impl Expression {
                     + " "
                     + &right.to_code()
                     + ")"
+            }
+            Expression::IfExpression {
+                condition,
+                consequence,
+                alternative,
+            } => {
+                let alternative = if let Some(alternative) = alternative {
+                    "else ".to_string() + &alternative.to_code()
+                } else {
+                    "".to_string()
+                };
+                "if ".to_string()
+                    + &condition.to_code()
+                    + " "
+                    + &consequence.to_code()
+                    + " "
+                    + &alternative
             }
             Expression::Illegal => "[illegal expression]".to_string(),
         }
