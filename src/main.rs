@@ -1,5 +1,5 @@
 use go_interpreter::lexer::Lexer;
-use go_interpreter::token::Token;
+use go_interpreter::parser::Parser;
 use std::io::{stdin, stdout, Write};
 
 fn main() {
@@ -9,14 +9,12 @@ fn main() {
         stdout().flush().unwrap();
         let mut scan = String::new();
         stdin().read_line(&mut scan).expect("Failed to read line.");
-        let mut lexer = Lexer::new(&scan);
-        loop {
-            let tok = lexer.read_next_token();
-            if tok == Token::EndOfFile {
-                break;
-            } else {
-                println!("{:?}", tok);
-            }
-        }
+        let lexer = Lexer::new(&scan);
+        let mut parser = Parser::new(lexer);
+
+        match parser.parse_program() {
+            Ok(program) => println!("{}", program.to_code()),
+            Err(err) => println!("エラー: {}", err),
+        };
     }
 }
