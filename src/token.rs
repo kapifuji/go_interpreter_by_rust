@@ -34,14 +34,11 @@ pub enum Token {
 impl Token {
     pub fn precedence(&self) -> operator::Precedences {
         match self {
-            Token::Equal => operator::Precedences::Equals,
-            Token::NotEqual => operator::Precedences::Equals,
-            Token::LessThan => operator::Precedences::LessGreater,
-            Token::GreaterThan => operator::Precedences::LessGreater,
-            Token::Plus => operator::Precedences::Sum,
-            Token::Minus => operator::Precedences::Sum,
-            Token::Slash => operator::Precedences::Product,
-            Token::Asterisk => operator::Precedences::Product,
+            Token::Equal | Token::NotEqual => operator::Precedences::Equals,
+            Token::LessThan | Token::GreaterThan => operator::Precedences::LessGreater,
+            Token::Plus | Token::Minus => operator::Precedences::Sum,
+            Token::Slash | Token::Asterisk => operator::Precedences::Product,
+            Token::Lparentheses => operator::Precedences::Call,
             _ => operator::Precedences::Lowest,
         }
     }

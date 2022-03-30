@@ -75,7 +75,7 @@ impl<'a> Parser<'a> {
         self.expect_current(token::Token::Assign)?;
 
         self.seek_token(); // 式 に進む
-        let expression = self.parse_expression(self.current_token.precedence())?;
+        let expression = self.parse_expression(operator::Precedences::Lowest)?;
 
         self.seek_token(); // Semicolon に進む
         self.expect_current(token::Token::Semicolon)?;
@@ -88,7 +88,7 @@ impl<'a> Parser<'a> {
 
     fn parse_return_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         self.seek_token(); // 式 に進む
-        let expression = self.parse_expression(self.current_token.precedence())?;
+        let expression = self.parse_expression(operator::Precedences::Lowest)?;
 
         self.seek_token(); // Semicolon に進む
         self.expect_current(token::Token::Semicolon)?;
@@ -98,7 +98,7 @@ impl<'a> Parser<'a> {
 
     fn parse_expression_statement(&mut self) -> Result<ast::Statement, Box<dyn std::error::Error>> {
         // 式文は文のトークンが無いのでここでseek不要
-        let expression = self.parse_expression(self.current_token.precedence())?;
+        let expression = self.parse_expression(operator::Precedences::Lowest)?;
 
         if self.next_token == token::Token::Semicolon {
             // 式文では Semicolonは省略可能
@@ -139,7 +139,7 @@ impl<'a> Parser<'a> {
             && (precedence < self.next_token.precedence())
         {
             self.seek_token(); // Infix に進む
-            expression = self.parse_infix_expression(expression.clone())?;
+            expression = self.parse_infix_expression(&expression)?;
         }
 
         Ok(expression)
@@ -179,8 +179,11 @@ impl<'a> Parser<'a> {
 
     fn parse_infix_expression(
         &mut self,
-        left: ast::Expression,
+        left: &ast::Expression,
     ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        if self.current_token == token::Token::Lparentheses {
+            return self.parse_call_expression(&left);
+        }
         let infix = match self.current_token {
             token::Token::Plus => operator::Infix::Plus,
             token::Token::Minus => operator::Infix::Minus,
@@ -200,9 +203,23 @@ impl<'a> Parser<'a> {
         let right = self.parse_expression(precedence)?;
 
         Ok(ast::Expression::InfixExpression {
-            left: Box::new(left),
+            left: Box::new(left.clone()),
             operator: infix,
             right: Box::new(right),
+        })
+    }
+
+    fn parse_call_expression(
+        &mut self,
+        function: &ast::Expression,
+    ) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        self.seek_token(); // 引数 or Rparenthesesに進む
+        let args = self.parse_function_parameters()?;
+        self.expect_current(token::Token::Rparentheses)?;
+
+        Ok(ast::Expression::Call {
+            function: Box::new(function.clone()),
+            args: args,
         })
     }
 
@@ -211,7 +228,7 @@ impl<'a> Parser<'a> {
         self.expect_current(token::Token::Lparentheses)?;
 
         self.seek_token(); // 条件式 に進む
-        let condition = self.parse_expression(self.current_token.precedence())?;
+        let condition = self.parse_expression(operator::Precedences::Lowest)?;
 
         self.seek_token(); // Rparentheses に進む
         self.expect_current(token::Token::Rparentheses)?;
@@ -266,12 +283,12 @@ impl<'a> Parser<'a> {
         }
 
         // 1つ目のパラメータ
-        parameters.push(self.parse_expression(self.current_token.precedence())?);
+        parameters.push(self.parse_expression(operator::Precedences::Lowest)?);
 
         self.seek_token(); // Comma or Rparentheses に進む
         while self.current_token == token::Token::Comma {
             self.seek_token(); // パラメータに進む
-            parameters.push(self.parse_expression(self.current_token.precedence())?);
+            parameters.push(self.parse_expression(operator::Precedences::Lowest)?);
             self.seek_token(); // Comma or Rparentheses に進む
         }
 
@@ -280,7 +297,7 @@ impl<'a> Parser<'a> {
 
     fn parse_grouped_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
         self.seek_token(); // 式 に進む
-        let expression = self.parse_expression(self.current_token.precedence())?;
+        let expression = self.parse_expression(operator::Precedences::Lowest)?;
 
         self.seek_token(); // Rparentheses に進む
         self.expect_current(token::Token::Rparentheses)?;
@@ -860,6 +877,77 @@ return 993322;
     }
 
     #[test]
+    fn test_call_expression() {
+        let input = "add(1, 2 * 3, 4 + 5);";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+
+        let expression = test_expression_statement(statement);
+
+        // 関数呼出式 確認
+        let (function, args) = if let ast::Expression::Call { function, args } = expression {
+            (function, args)
+        } else {
+            panic!("expected ast::Expression::Call, but got {:?}", expression);
+        };
+
+        // function 確認
+        test_identifier_literal(&function, "add".to_string());
+
+        // args 確認
+        assert_eq!(args.len(), 3);
+
+        test_integer_literal(&args[0], 1);
+
+        let (expression_left, operator, expression_right) =
+            if let ast::Expression::InfixExpression {
+                left,
+                operator,
+                right,
+            } = &args[1]
+            {
+                (left, operator, right)
+            } else {
+                panic!(
+                    "expected ast::Expression::InfixExpression, but got {:?}",
+                    args[1]
+                );
+            };
+
+        test_integer_literal(&expression_left, 2);
+        assert_eq!(*operator, operator::Infix::Asterisk);
+        test_integer_literal(&expression_right, 3);
+
+        let (expression_left, operator, expression_right) =
+            if let ast::Expression::InfixExpression {
+                left,
+                operator,
+                right,
+            } = &args[2]
+            {
+                (left, operator, right)
+            } else {
+                panic!(
+                    "expected ast::Expression::InfixExpression, but got {:?}",
+                    args[3]
+                );
+            };
+
+        test_integer_literal(&expression_left, 4);
+        assert_eq!(*operator, operator::Infix::Plus);
+        test_integer_literal(&expression_right, 5);
+    }
+
+    #[test]
     fn test_operator_precedence_parsing() {
         let problem = [
             ("a + b;", "(a + b);\n"),
@@ -886,6 +974,9 @@ return 993322;
             ("!(true == true);", "(!(true == true));\n"),
             ("1 + (2 - 3) * 4;", "(1 + ((2 - 3) * 4));\n"),
             ("(1 + -(2 + 3)) * 4;", "((1 + (-(2 + 3))) * 4);\n"),
+            ("add(1, 2) + 3 > 4", "((add(1, 2) + 3) > 4);\n"),
+            ("add(x, y, 1, 2*3, 4+5, add(z) )", "add(x, y, 1, (2 * 3), (4 + 5), add(z));\n"),
+            ("add(1 + 2 - 3 * 4 / 5 + 6)", "add((((1 + 2) - ((3 * 4) / 5)) + 6));\n"),
         ];
 
         for (input, result) in problem {

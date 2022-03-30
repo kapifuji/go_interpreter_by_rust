@@ -39,6 +39,10 @@ pub enum Expression {
         parameters: Vec<Expression>,
         body: Box<Statement>,
     },
+    Call {
+        function: Box<Expression>,
+        args: Vec<Expression>,
+    },
 }
 
 impl Program {
@@ -142,6 +146,19 @@ impl Expression {
                 code.push_str(param_list.join(", ").as_str());
                 code.push_str(")");
                 code.push_str(&body.to_code());
+
+                code
+            }
+            Expression::Call { function, args } => {
+                let args_list = args
+                    .iter()
+                    .map(|arg| arg.to_code())
+                    .collect::<Vec<String>>();
+                let mut code = "".to_string();
+                code.push_str(&function.to_code());
+                code.push_str("(");
+                code.push_str(args_list.join(", ").as_str());
+                code.push_str(")");
 
                 code
             }
