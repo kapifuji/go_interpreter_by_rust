@@ -319,14 +319,6 @@ impl<'a> Parser<'a> {
             })?
         }
     }
-
-    fn check_current_token(&self, token: token::Token) -> bool {
-        self.current_token == token
-    }
-
-    fn check_next_token(&self, token: token::Token) -> bool {
-        self.next_token == token
-    }
 }
 
 #[cfg(test)]
