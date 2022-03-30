@@ -84,8 +84,10 @@ impl Statement {
             Statement::Block(statements) => {
                 code.push('{');
                 for statement in statements {
+                    code.push('\n');
                     code.push_str(statement.to_code().as_str());
                 }
+                code.push('\n');
                 code.push('}');
             }
         }
