@@ -127,8 +127,8 @@ impl<'a> Parser<'a> {
             token::Token::False => self.parse_boolean(false)?,
             token::Token::Lparentheses => self.parse_grouped_expression()?,
             token::Token::If => self.parse_if_expression()?,
-            other => {
-                println!("{:?}", other);
+            token::Token::Function => self.parse_function_expression()?,
+            _ => {
                 return Err(error::ParserError::UnImplementationParser(
                     "式のパーサーが未実装です。",
                 ))?;
@@ -236,6 +236,46 @@ impl<'a> Parser<'a> {
             consequence: Box::new(consequence),
             alternative: alternative,
         })
+    }
+
+    fn parse_function_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
+        self.seek_token(); // Lparentheses に進む
+        self.expect_current(token::Token::Lparentheses)?;
+
+        self.seek_token(); // パラメータ or Rparentheses に進む
+        let parameters = self.parse_function_parameters()?;
+        self.expect_current(token::Token::Rparentheses)?;
+
+        self.seek_token(); // Lbrace に進む
+        self.expect_current(token::Token::Lbrace)?;
+        let body = self.parse_block_statement()?;
+
+        Ok(ast::Expression::Function {
+            parameters: parameters,
+            body: Box::new(body),
+        })
+    }
+
+    fn parse_function_parameters(
+        &mut self,
+    ) -> Result<Vec<ast::Expression>, Box<dyn std::error::Error>> {
+        let mut parameters: Vec<ast::Expression> = Vec::new();
+
+        if self.current_token == token::Token::Rparentheses {
+            return Ok(parameters);
+        }
+
+        // 1つ目のパラメータ
+        parameters.push(self.parse_expression(self.current_token.precedence())?);
+
+        self.seek_token(); // Comma or Rparentheses に進む
+        while self.current_token == token::Token::Comma {
+            self.seek_token(); // パラメータに進む
+            parameters.push(self.parse_expression(self.current_token.precedence())?);
+            self.seek_token(); // Comma or Rparentheses に進む
+        }
+
+        Ok(parameters)
     }
 
     fn parse_grouped_expression(&mut self) -> Result<ast::Expression, Box<dyn std::error::Error>> {
@@ -708,6 +748,115 @@ return 993322;
         };
 
         test_identifier_literal(&expression, "y".to_string());
+    }
+
+    #[test]
+    fn test_function_expression() {
+        let input = "fn(x, y) { x + y; }";
+
+        let lexer = lexer::Lexer::new(input);
+        let mut parser = Parser::new(lexer);
+        let program = match parser.parse_program() {
+            Ok(program) => program,
+            Err(err) => panic!("エラー: {}", err),
+        };
+
+        assert_eq!(program.statements.len(), 1);
+
+        let statement = &program.statements[0];
+
+        let expression = test_expression_statement(statement);
+
+        // 関数リテラル 確認
+        let (parameters, body) = if let ast::Expression::Function { parameters, body } = expression
+        {
+            (parameters, body)
+        } else {
+            panic!(
+                "expected ast::Expression::Function, but got {:?}",
+                expression
+            );
+        };
+
+        // parameters 確認
+        assert_eq!(parameters.len(), 2);
+
+        test_identifier_literal(&parameters[0], "x".to_string());
+        test_identifier_literal(&parameters[1], "y".to_string());
+
+        // body 確認
+        let statement = if let ast::Statement::Block(statements) = *body {
+            assert_eq!(statements.len(), 1);
+            statements[0].clone()
+        } else {
+            panic!("expected ast::Statement::Block, but got {:?}", body);
+        };
+
+        let expression = if let ast::Statement::Expression(expression) = statement {
+            expression
+        } else {
+            panic!(
+                "expected ast::Statement::Expression, but got {:?}",
+                statement
+            );
+        };
+
+        if let ast::Expression::InfixExpression {
+            left,
+            operator,
+            right,
+        } = expression
+        {
+            test_identifier_literal(&left, "x".to_string());
+            assert_eq!(operator, operator::Infix::Plus);
+            test_identifier_literal(&right, "y".to_string());
+        } else {
+            panic!(
+                "expected ast::Expression::InfixExpression, but got {:?}",
+                expression
+            );
+        }
+    }
+
+    #[test]
+    fn test_function_parameter() {
+        let problem = [
+            ("fn() { }", Vec::new()),
+            ("fn(x) {}", vec!["x"]),
+            ("fn(x, y, z) {}", vec!["x", "y", "z"]),
+        ];
+
+        for (input, results) in problem {
+            let lexer = lexer::Lexer::new(input);
+            let mut parser = Parser::new(lexer);
+            let program = match parser.parse_program() {
+                Ok(program) => program,
+                Err(err) => panic!("エラー: {}", err),
+            };
+
+            assert_eq!(program.statements.len(), 1);
+
+            let statement = &program.statements[0];
+
+            let expression = test_expression_statement(statement);
+
+            // 関数リテラル 確認
+            let parameters = if let ast::Expression::Function { parameters, .. } = expression {
+                parameters
+            } else {
+                panic!(
+                    "expected ast::Expression::Function, but got {:?}",
+                    expression
+                );
+            };
+
+            // parameters 確認
+            assert_eq!(parameters.len(), results.len());
+
+            for (i, result) in results.iter().enumerate() {
+                test_identifier_literal(&parameters[i], result.to_string());
+            }
+        }
     }
 
     #[test]

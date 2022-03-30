@@ -35,6 +35,10 @@ pub enum Expression {
         consequence: Box<Statement>,
         alternative: Option<Box<Statement>>,
     },
+    Function {
+        parameters: Vec<Expression>,
+        body: Box<Statement>,
+    },
 }
 
 impl Program {
@@ -127,6 +131,19 @@ impl Expression {
                     + &consequence.to_code()
                     + " "
                     + &alternative
+            }
+            Expression::Function { parameters, body } => {
+                let param_list = parameters
+                    .iter()
+                    .map(|param| param.to_code())
+                    .collect::<Vec<String>>();
+                let mut code = "".to_string();
+                code.push_str("fn(");
+                code.push_str(param_list.join(", ").as_str());
+                code.push_str(")");
+                code.push_str(&body.to_code());
+
+                code
             }
             Expression::Illegal => "[illegal expression]".to_string(),
         }
