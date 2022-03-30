@@ -77,8 +77,10 @@ impl<'a> Parser<'a> {
         self.seek_token(); // 式 に進む
         let expression = self.parse_expression(operator::Precedences::Lowest)?;
 
-        self.seek_token(); // Semicolon に進む
-        self.expect_current(token::Token::Semicolon)?;
+        if self.next_token == token::Token::Semicolon {
+            // Semicolonは省略可能
+            self.seek_token(); // Semicolon に進む
+        }
 
         Ok(ast::Statement::Let {
             identifier: identifier,
@@ -90,8 +92,10 @@ impl<'a> Parser<'a> {
         self.seek_token(); // 式 に進む
         let expression = self.parse_expression(operator::Precedences::Lowest)?;
 
-        self.seek_token(); // Semicolon に進む
-        self.expect_current(token::Token::Semicolon)?;
+        if self.next_token == token::Token::Semicolon {
+            // Semicolonは省略可能
+            self.seek_token(); // Semicolon に進む
+        }
 
         Ok(ast::Statement::Return(expression))
     }
@@ -101,7 +105,7 @@ impl<'a> Parser<'a> {
         let expression = self.parse_expression(operator::Precedences::Lowest)?;
 
         if self.next_token == token::Token::Semicolon {
-            // 式文では Semicolonは省略可能
+            // Semicolonは省略可能
             self.seek_token(); // Semicolon に進む
         }
 
@@ -331,33 +335,31 @@ mod tests {
 
     #[test]
     fn test_let_statements() {
-        let input = "
-let x = 5;
-let y = 5;
-let foobar = 838383;
-";
-        let results = ["x", "y", "foobar"];
+        let problem = [
+            ("let x = 5;", "x", 5),
+            ("let y = 5;", "y", 5),
+            ("let foobar = 838383;", "foobar", 838383),
+        ];
 
-        let lexer = lexer::Lexer::new(&input);
-        let mut parser = Parser::new(lexer);
+        for (input, name, num) in problem {
+            let lexer = lexer::Lexer::new(&input);
+            let mut parser = Parser::new(lexer);
 
-        let program = match parser.parse_program() {
-            Ok(program) => program,
-            Err(err) => panic!("エラー: {}", err),
-        };
+            let program = match parser.parse_program() {
+                Ok(program) => program,
+                Err(err) => panic!("エラー: {}", err),
+            };
 
-        assert_eq!(program.statements.len(), 3);
+            assert_eq!(program.statements.len(), 1);
 
-        for (i, test) in results.iter().enumerate() {
-            test_let_statement(&program.statements[i], test);
+            test_let_statement(&program.statements[0], name, num);
         }
     }
 
-    fn test_let_statement(statement: &ast::Statement, expected_name: &str) {
-        if let ast::Statement::Let { identifier, .. } = statement {
-            if let ast::Expression::Identifier(name) = identifier {
-                assert_eq!(name, expected_name);
-            }
+    fn test_let_statement(statement: &ast::Statement, name: &str, num: i32) {
+        if let ast::Statement::Let { identifier, value } = statement {
+            test_identifier_literal(identifier, name);
+            test_integer_literal(value, num);
         } else {
             panic!("expected ast::Statement::Let, but got {:?}", statement);
         }
@@ -365,28 +367,30 @@ let foobar = 838383;
 
     #[test]
     fn test_return_statements() {
-        let input = "
-return 5;
-return 10;
-return 993322;
-";
-        let lexer = lexer::Lexer::new(&input);
-        let mut parser = Parser::new(lexer);
+        let problem = [
+            ("return 5;", 5),
+            ("return 10", 10),
+            ("return 993322", 993322),
+        ];
 
-        let program = match parser.parse_program() {
-            Ok(program) => program,
-            Err(err) => panic!("エラー: {}", err),
-        };
+        for (input, result_num) in problem {
+            let lexer = lexer::Lexer::new(&input);
+            let mut parser = Parser::new(lexer);
 
-        assert_eq!(program.statements.len(), 3);
+            let program = match parser.parse_program() {
+                Ok(program) => program,
+                Err(err) => panic!("エラー: {}", err),
+            };
 
-        for i in 0..3 {
-            test_return_statement(&program.statements[i]);
+            assert_eq!(program.statements.len(), 1);
+
+            test_return_statement(&program.statements[0], result_num);
         }
     }
 
-    fn test_return_statement(statement: &ast::Statement) {
-        if let ast::Statement::Return(_) = statement {
+    fn test_return_statement(statement: &ast::Statement, num: i32) {
+        if let ast::Statement::Return(exp) = statement {
+            test_integer_literal(exp, num);
         } else {
             panic!("expected ast::Statement::Return, but got {:?}", statement);
         }
@@ -409,7 +413,7 @@ return 993322;
 
         let expression = test_expression_statement(statement);
 
-        test_identifier_literal(&expression, "foobar".to_string());
+        test_identifier_literal(&expression, "foobar");
     }
 
     #[test]
@@ -479,7 +483,7 @@ return 993322;
         assert_eq!(*integer, cmp_num);
     }
 
-    fn test_identifier_literal(expression: &ast::Expression, cmp_num: String) {
+    fn test_identifier_literal(expression: &ast::Expression, cmp_str: &str) {
         let identifier = if let ast::Expression::Identifier(identifier) = expression {
             identifier
         } else {
@@ -489,7 +493,7 @@ return 993322;
             );
         };
 
-        assert_eq!(*identifier, cmp_num);
+        assert_eq!(*identifier, cmp_str);
     }
 
     fn test_boolean_literal(expression: &ast::Expression, cmp_bool: bool) {
@@ -640,9 +644,9 @@ return 993322;
                 );
             };
 
-        test_identifier_literal(&expression_left, "x".to_string());
+        test_identifier_literal(&expression_left, "x");
         assert_eq!(operator, operator::Infix::LessThan);
-        test_identifier_literal(&expression_right, "y".to_string());
+        test_identifier_literal(&expression_right, "y");
 
         // consequence 確認
         let statement = if let ast::Statement::Block(statements) = *consequence {
@@ -661,7 +665,7 @@ return 993322;
             );
         };
 
-        test_identifier_literal(&expression, "x".to_string());
+        test_identifier_literal(&expression, "x");
 
         // alternative 確認
         if let None = alternative {
@@ -718,9 +722,9 @@ return 993322;
                 );
             };
 
-        test_identifier_literal(&expression_left, "x".to_string());
+        test_identifier_literal(&expression_left, "x");
         assert_eq!(operator, operator::Infix::LessThan);
-        test_identifier_literal(&expression_right, "y".to_string());
+        test_identifier_literal(&expression_right, "y");
 
         // consequence 確認
         let statement = if let ast::Statement::Block(statements) = *consequence {
@@ -739,7 +743,7 @@ return 993322;
             );
         };
 
-        test_identifier_literal(&expression, "x".to_string());
+        test_identifier_literal(&expression, "x");
 
         // alternative 確認
         let alternative = if let Some(alternative) = alternative {
@@ -764,7 +768,7 @@ return 993322;
             );
         };
 
-        test_identifier_literal(&expression, "y".to_string());
+        test_identifier_literal(&expression, "y");
     }
 
     #[test]
@@ -798,8 +802,8 @@ return 993322;
         // parameters 確認
         assert_eq!(parameters.len(), 2);
 
-        test_identifier_literal(&parameters[0], "x".to_string());
-        test_identifier_literal(&parameters[1], "y".to_string());
+        test_identifier_literal(&parameters[0], "x");
+        test_identifier_literal(&parameters[1], "y");
 
         // body 確認
         let statement = if let ast::Statement::Block(statements) = *body {
@@ -824,9 +828,9 @@ return 993322;
             right,
         } = expression
         {
-            test_identifier_literal(&left, "x".to_string());
+            test_identifier_literal(&left, "x");
             assert_eq!(operator, operator::Infix::Plus);
-            test_identifier_literal(&right, "y".to_string());
+            test_identifier_literal(&right, "y");
         } else {
             panic!(
                 "expected ast::Expression::InfixExpression, but got {:?}",
@@ -871,7 +875,7 @@ return 993322;
             assert_eq!(parameters.len(), results.len());
 
             for (i, result) in results.iter().enumerate() {
-                test_identifier_literal(&parameters[i], result.to_string());
+                test_identifier_literal(&parameters[i], result);
             }
         }
     }
@@ -901,7 +905,7 @@ return 993322;
         };
 
         // function 確認
-        test_identifier_literal(&function, "add".to_string());
+        test_identifier_literal(&function, "add");
 
         // args 確認
         assert_eq!(args.len(), 3);
@@ -975,8 +979,14 @@ return 993322;
             ("1 + (2 - 3) * 4;", "(1 + ((2 - 3) * 4));\n"),
             ("(1 + -(2 + 3)) * 4;", "((1 + (-(2 + 3))) * 4);\n"),
             ("add(1, 2) + 3 > 4", "((add(1, 2) + 3) > 4);\n"),
-            ("add(x, y, 1, 2*3, 4+5, add(z) )", "add(x, y, 1, (2 * 3), (4 + 5), add(z));\n"),
-            ("add(1 + 2 - 3 * 4 / 5 + 6)", "add((((1 + 2) - ((3 * 4) / 5)) + 6));\n"),
+            (
+                "add(x, y, 1, 2*3, 4+5, add(z) )",
+                "add(x, y, 1, (2 * 3), (4 + 5), add(z));\n",
+            ),
+            (
+                "add(1 + 2 - 3 * 4 / 5 + 6)",
+                "add((((1 + 2) - ((3 * 4) / 5)) + 6));\n",
+            ),
         ];
 
         for (input, result) in problem {
