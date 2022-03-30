@@ -4,7 +4,7 @@ use crate::lexer;
 use crate::operator;
 use crate::token;
 
-struct Parser<'a> {
+pub struct Parser<'a> {
     lexer: lexer::Lexer<'a>,
     current_token: token::Token,
     next_token: token::Token,
