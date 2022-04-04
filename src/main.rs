@@ -1,7 +1,7 @@
-use go_interpreter::lexer::Lexer;
-use go_interpreter::parser::Parser;
 use go_interpreter::evaluator::Evaluator;
+use go_interpreter::lexer::Lexer;
 use go_interpreter::object::Object;
+use go_interpreter::parser::Parser;
 use std::io::{stdin, stdout, Write};
 
 fn main() {
@@ -14,7 +14,7 @@ fn main() {
         let lexer = Lexer::new(&scan);
         let mut parser = Parser::new(lexer);
         let ast_root = parser.parse_program().expect("Filed to parse program.");
-        
+
         let evaluated = Evaluator::eval(&ast_root).expect("Filed to eval ast.");
         println!("{}", evaluated.inspect());
     }
