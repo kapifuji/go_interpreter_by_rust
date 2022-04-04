@@ -29,6 +29,7 @@ impl Evaluator {
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match expression {
             ast::Expression::Integer(integer) => Ok(object::Object::Integer(*integer)),
+            ast::Expression::Boolean(boolean) => Ok(object::Object::Boolean(*boolean)),
             _ => Ok(object::Object::Null),
         }
     }
@@ -48,6 +49,16 @@ mod tests {
         }
     }
 
+    #[test]
+    fn test_eval_boolean_expression() {
+        let tests = [("true", true), ("false", false)];
+
+        for (input, result) in tests {
+            let evaluated = test_eval(input);
+            test_boolean_object(&evaluated, result);
+        }
+    }
+
     fn test_eval(input: &str) -> object::Object {
         let lexer = lexer::Lexer::new(input);
         let mut parser = parser::Parser::new(lexer);
@@ -63,5 +74,15 @@ mod tests {
         };
 
         assert_eq!(*integer, expected);
+    }
+
+    fn test_boolean_object(object: &object::Object, expected: bool) {
+        let boolean = if let object::Object::Boolean(boolean) = object {
+            boolean
+        } else {
+            panic!("Object::Bool を期待しましたが、{:?}でした。", object);
+        };
+
+        assert_eq!(*boolean, expected);
     }
 }
