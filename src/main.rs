@@ -1,6 +1,5 @@
 use go_interpreter::evaluator::Evaluator;
 use go_interpreter::lexer::Lexer;
-use go_interpreter::object::Object;
 use go_interpreter::parser::Parser;
 use std::io::{stdin, stdout, Write};
 
