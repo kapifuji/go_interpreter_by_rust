@@ -6,8 +6,14 @@ pub struct Evaluator {}
 
 impl Evaluator {
     pub fn eval(root: &ast::Program) -> Result<object::Object, Box<dyn std::error::Error>> {
+        Evaluator::eval_statements(&root.statements)
+    }
+
+    fn eval_statements(
+        statements: &Vec<ast::Statement>,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
         let mut result = Ok(object::Object::Null);
-        for statement in &root.statements {
+        for statement in statements {
             result = Evaluator::eval_statement(&statement);
         }
 
@@ -19,6 +25,7 @@ impl Evaluator {
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match statement {
             ast::Statement::Expression(expression) => Evaluator::eval_expression(expression),
+            ast::Statement::Block(statements) => Evaluator::eval_statements(statements),
             _ => Ok(object::Object::Null),
         }
     }
@@ -44,6 +51,14 @@ impl Evaluator {
                 let left = Evaluator::eval_expression(left)?;
                 let right = Evaluator::eval_expression(right)?;
                 Evaluator::eval_infix_expression(&left, operator.clone(), &right)
+            }
+            ast::Expression::IfExpression {
+                condition,
+                consequence,
+                alternative,
+            } => {
+                let condition = Evaluator::eval_expression(condition)?;
+                Evaluator::eval_if_expression(&condition, consequence, &alternative)
             }
             _ => Ok(object::Object::Null),
         }
@@ -109,6 +124,34 @@ impl Evaluator {
             operator::Infix::Equal => Ok(object::Object::Boolean(left == right)),
             operator::Infix::NotEqual => Ok(object::Object::Boolean(left != right)),
             _ => Ok(object::Object::Null),
+        }
+    }
+
+    fn eval_if_expression(
+        condition: &object::Object,
+        consequence: &ast::Statement,
+        alternative: &Option<Box<ast::Statement>>,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
+        match condition {
+            object::Object::Boolean(boolean) => {
+                if *boolean == true {
+                    Evaluator::eval_statement(consequence)
+                } else {
+                    if let Some(alternative) = alternative {
+                        Evaluator::eval_statement(alternative)
+                    } else {
+                        Ok(object::Object::Null)
+                    }
+                }
+            }
+            object::Object::Integer(_) => Evaluator::eval_statement(consequence),
+            object::Object::Null => {
+                if let Some(alternative) = alternative {
+                    Evaluator::eval_statement(alternative)
+                } else {
+                    Ok(object::Object::Null)
+                }
+            }
         }
     }
 
@@ -186,6 +229,26 @@ mod tests {
         for (input, result) in tests {
             let evaluated = test_eval(input);
             test_boolean_object(&evaluated, result);
+        }
+    }
+
+    #[test]
+    fn test_eval_if_expression() {
+        let tests = [
+            ("if (true) { 1 }", object::Object::Integer(1)),
+            ("if (false) { 1 }", object::Object::Null),
+            ("if (true) { 1 } else { 2 }", object::Object::Integer(1)),
+            ("if (false) { 1 } else { 2 }", object::Object::Integer(2)),
+            ("if (5) { 1 } else { 2 }", object::Object::Integer(1)),
+            ("if (!5) { 1 } else { 2 }", object::Object::Integer(2)),
+            ("if (1 < 2) { 1 } else { 2 }", object::Object::Integer(1)),
+            ("if (1 > 2) { 1 } else { 2 }", object::Object::Integer(2)),
+            ("if (1 > 2) { 1 }", object::Object::Null),
+        ];
+
+        for (input, result) in tests {
+            let evaluated = test_eval(input);
+            assert_eq!(evaluated, result);
         }
     }
 
