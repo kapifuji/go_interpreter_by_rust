@@ -1,7 +1,6 @@
 use crate::ast;
-use crate::lexer;
 use crate::object;
-use crate::parser;
+use crate::operator;
 
 pub struct Evaluator {}
 
@@ -30,7 +29,34 @@ impl Evaluator {
         match expression {
             ast::Expression::Integer(integer) => Ok(object::Object::Integer(*integer)),
             ast::Expression::Boolean(boolean) => Ok(object::Object::Boolean(*boolean)),
+            ast::Expression::PrefixExpression {
+                operator,
+                expression,
+            } => {
+                let object = Evaluator::eval_expression(expression);
+                Evaluator::eval_prefix_expression(operator.clone(), &(object?))
+            }
             _ => Ok(object::Object::Null),
+        }
+    }
+
+    fn eval_prefix_expression(
+        operator: operator::Prefix,
+        object: &object::Object,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
+        match operator {
+            operator::Prefix::Exclamation => Evaluator::eval_exclamation_operator(object),
+            _ => Ok(object::Object::Null),
+        }
+    }
+
+    fn eval_exclamation_operator(
+        object: &object::Object,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
+        match object {
+            object::Object::Boolean(boolean) => Ok(object::Object::Boolean(!boolean)),
+            object::Object::Null => Ok(object::Object::Boolean(true)),
+            _ => Ok(object::Object::Boolean(false)),
         }
     }
 }
@@ -38,6 +64,8 @@ impl Evaluator {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lexer;
+    use crate::parser;
 
     #[test]
     fn test_eval_integer_expression() {
@@ -52,6 +80,23 @@ mod tests {
     #[test]
     fn test_eval_boolean_expression() {
         let tests = [("true", true), ("false", false)];
+
+        for (input, result) in tests {
+            let evaluated = test_eval(input);
+            test_boolean_object(&evaluated, result);
+        }
+    }
+
+    #[test]
+    fn test_eval_bang_operator() {
+        let tests = [
+            ("!true", false),
+            ("!false", true),
+            ("!5", false),
+            ("!!true", true),
+            ("!!!true", false),
+            ("!!5", true),
+        ];
 
         for (input, result) in tests {
             let evaluated = test_eval(input);
