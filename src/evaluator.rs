@@ -82,6 +82,10 @@ impl Evaluator {
             operator::Infix::Minus => Ok(object::Object::Integer(left - right)),
             operator::Infix::Asterisk => Ok(object::Object::Integer(left * right)),
             operator::Infix::Slash => Ok(object::Object::Integer(left / right)),
+            operator::Infix::LessThan => Ok(object::Object::Boolean(left < right)),
+            operator::Infix::GreaterThan => Ok(object::Object::Boolean(left > right)),
+            operator::Infix::Equal => Ok(object::Object::Boolean(left == right)),
+            operator::Infix::NotEqual => Ok(object::Object::Boolean(left != right)),
             _ => Ok(object::Object::Null),
         }
     }
@@ -136,7 +140,18 @@ mod tests {
 
     #[test]
     fn test_eval_boolean_expression() {
-        let tests = [("true", true), ("false", false)];
+        let tests = [
+            ("true", true),
+            ("false", false),
+            ("1 < 2", true),
+            ("1 > 2", false),
+            ("1 == 2", false),
+            ("1 != 2", true),
+            ("1 > 2", false),
+            ("1 < 2", true),
+            ("1 == 1", true),
+            ("2 != 2", false),
+        ];
 
         for (input, result) in tests {
             let evaluated = test_eval(input);
