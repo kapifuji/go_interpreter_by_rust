@@ -56,7 +56,6 @@ impl Evaluator {
         match operator {
             operator::Prefix::Exclamation => Evaluator::eval_exclamation_operator(object),
             operator::Prefix::Minus => Evaluator::eval_minus_prefix_operator(object),
-            _ => Ok(object::Object::Null),
         }
     }
 
@@ -65,18 +64,30 @@ impl Evaluator {
         operator: operator::Infix,
         right: &object::Object,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
-        let left = if let object::Object::Integer(integer) = left {
-            integer
-        } else {
-            return Ok(object::Object::Null);
-        };
+        match left {
+            object::Object::Integer(left) => {
+                if let object::Object::Integer(right) = right {
+                    Evaluator::eval_integer_infix_expression(*left, operator, *right)
+                } else {
+                    Ok(object::Object::Null)
+                }
+            }
+            object::Object::Boolean(left) => {
+                if let object::Object::Boolean(right) = right {
+                    Evaluator::eval_boolean_infix_expression(*left, operator, *right)
+                } else {
+                    Ok(object::Object::Null)
+                }
+            }
+            _ => Ok(object::Object::Null),
+        }
+    }
 
-        let right = if let object::Object::Integer(integer) = right {
-            integer
-        } else {
-            return Ok(object::Object::Null);
-        };
-
+    fn eval_integer_infix_expression(
+        left: i32,
+        operator: operator::Infix,
+        right: i32,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
             operator::Infix::Plus => Ok(object::Object::Integer(left + right)),
             operator::Infix::Minus => Ok(object::Object::Integer(left - right)),
@@ -84,6 +95,17 @@ impl Evaluator {
             operator::Infix::Slash => Ok(object::Object::Integer(left / right)),
             operator::Infix::LessThan => Ok(object::Object::Boolean(left < right)),
             operator::Infix::GreaterThan => Ok(object::Object::Boolean(left > right)),
+            operator::Infix::Equal => Ok(object::Object::Boolean(left == right)),
+            operator::Infix::NotEqual => Ok(object::Object::Boolean(left != right)),
+        }
+    }
+
+    fn eval_boolean_infix_expression(
+        left: bool,
+        operator: operator::Infix,
+        right: bool,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
+        match operator {
             operator::Infix::Equal => Ok(object::Object::Boolean(left == right)),
             operator::Infix::NotEqual => Ok(object::Object::Boolean(left != right)),
             _ => Ok(object::Object::Null),
@@ -151,6 +173,14 @@ mod tests {
             ("1 < 2", true),
             ("1 == 1", true),
             ("2 != 2", false),
+            ("true == true", true),
+            ("true != true", false),
+            ("true == false", false),
+            ("true != false", true),
+            ("(1 > 2) == true", false),
+            ("(1 > 2) != false", false),
+            ("(1 < 2) == false", false),
+            ("(1 > 2) != true", true),
         ];
 
         for (input, result) in tests {
