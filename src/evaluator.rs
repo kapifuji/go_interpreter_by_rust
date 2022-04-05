@@ -46,6 +46,7 @@ impl Evaluator {
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
             operator::Prefix::Exclamation => Evaluator::eval_exclamation_operator(object),
+            operator::Prefix::Minus => Evaluator::eval_minus_operator(object),
             _ => Ok(object::Object::Null),
         }
     }
@@ -59,6 +60,15 @@ impl Evaluator {
             _ => Ok(object::Object::Boolean(false)),
         }
     }
+
+    fn eval_minus_operator(
+        object: &object::Object,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
+        match object {
+            object::Object::Integer(integer) => Ok(object::Object::Integer(-integer)),
+            _ => Ok(object::Object::Null),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -69,7 +79,7 @@ mod tests {
 
     #[test]
     fn test_eval_integer_expression() {
-        let tests = [("1", 1), ("12", 12)];
+        let tests = [("1", 1), ("12", 12), ("-1", -1), ("-12", -12)];
 
         for (input, result) in tests {
             let evaluated = test_eval(input);
