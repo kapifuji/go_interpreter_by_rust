@@ -1,3 +1,5 @@
+use crate::object;
+use crate::operator;
 use crate::token;
 
 // anyhow, thiserror を利用すれば楽できるが、ローカル環境で git が通らないので妥協
@@ -15,6 +17,24 @@ pub enum ParserError<'a> {
     },
     UnImplementationStatemant(&'a str),
     UnImplementationParser(&'a str),
+}
+
+#[derive(Debug)]
+pub enum EvaluatorError {
+    TypeMissMatch {
+        left: object::Object,
+        operator: operator::Infix,
+        right: object::Object,
+    },
+    UnknowInfixOperator {
+        left: object::Object,
+        operator: operator::Infix,
+        right: object::Object,
+    },
+    UnknowPrefixOperator {
+        operator: operator::Prefix,
+        right: object::Object,
+    },
 }
 
 impl<'a> std::fmt::Display for ParserError<'a> {
@@ -44,4 +64,41 @@ impl<'a> std::fmt::Display for ParserError<'a> {
     }
 }
 
+impl std::fmt::Display for EvaluatorError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            self::EvaluatorError::TypeMissMatch {
+                left,
+                operator,
+                right,
+            } => {
+                write!(
+                    f,
+                    "型のミスマッチ: {} {} {}",
+                    left.inspect(),
+                    operator.to_code(),
+                    right.inspect()
+                )
+            }
+            self::EvaluatorError::UnknowInfixOperator {
+                left,
+                operator,
+                right,
+            } => {
+                write!(
+                    f,
+                    "未知の演算子: {} {} {}",
+                    left.inspect(),
+                    operator.to_code(),
+                    right.inspect()
+                )
+            }
+            self::EvaluatorError::UnknowPrefixOperator { operator, right } => {
+                write!(f, "未知の演算子: {}{}", operator.to_code(), right.inspect())
+            }
+        }
+    }
+}
+
 impl<'a> std::error::Error for ParserError<'a> {}
+impl<'a> std::error::Error for EvaluatorError {}

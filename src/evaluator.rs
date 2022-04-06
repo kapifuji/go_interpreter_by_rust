@@ -1,4 +1,5 @@
 use crate::ast;
+use crate::error;
 use crate::object;
 use crate::operator;
 
@@ -95,21 +96,33 @@ impl Evaluator {
         right: &object::Object,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match left {
-            object::Object::Integer(left) => {
-                if let object::Object::Integer(right) = right {
-                    Evaluator::eval_integer_infix_expression(*left, operator, *right)
+            object::Object::Integer(left_int) => {
+                if let object::Object::Integer(right_int) = right {
+                    Evaluator::eval_integer_infix_expression(*left_int, operator, *right_int)
                 } else {
-                    Ok(object::Object::Null)
+                    Err(error::EvaluatorError::TypeMissMatch {
+                        left: left.clone(),
+                        operator: operator,
+                        right: right.clone(),
+                    })?
                 }
             }
-            object::Object::Boolean(left) => {
-                if let object::Object::Boolean(right) = right {
-                    Evaluator::eval_boolean_infix_expression(*left, operator, *right)
+            object::Object::Boolean(left_bool) => {
+                if let object::Object::Boolean(right_bool) = right {
+                    Evaluator::eval_boolean_infix_expression(*left_bool, operator, *right_bool)
                 } else {
-                    Ok(object::Object::Null)
+                    Err(error::EvaluatorError::TypeMissMatch {
+                        left: left.clone(),
+                        operator: operator,
+                        right: right.clone(),
+                    })?
                 }
             }
-            _ => Ok(object::Object::Null),
+            _ => Err(error::EvaluatorError::TypeMissMatch {
+                left: left.clone(),
+                operator: operator,
+                right: right.clone(),
+            })?,
         }
     }
 
@@ -138,7 +151,11 @@ impl Evaluator {
         match operator {
             operator::Infix::Equal => Ok(object::Object::Boolean(left == right)),
             operator::Infix::NotEqual => Ok(object::Object::Boolean(left != right)),
-            _ => Ok(object::Object::Null),
+            _ => Err(error::EvaluatorError::UnknowInfixOperator {
+                left: object::Object::Boolean(left),
+                operator: operator,
+                right: object::Object::Boolean(right),
+            })?,
         }
     }
 
@@ -186,7 +203,10 @@ impl Evaluator {
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match object {
             object::Object::Integer(integer) => Ok(object::Object::Integer(-integer)),
-            _ => Ok(object::Object::Null),
+            _ => Err(error::EvaluatorError::UnknowPrefixOperator {
+                operator: operator::Prefix::Minus,
+                right: object.clone(),
+            })?,
         }
     }
 }
@@ -289,6 +309,43 @@ mod tests {
         for (input, result) in tests {
             let evaluated = test_eval(input);
             test_integer_object(&evaluated, result);
+        }
+    }
+
+    #[test]
+    fn test_eval_error() {
+        let tests = [
+            ("5 + true;", "型のミスマッチ: 5 + true"),
+            ("5 + true; 5;", "型のミスマッチ: 5 + true"),
+            ("-true", "未知の演算子: -true"),
+            ("true + false", "未知の演算子: true + false"),
+            ("if (true) { true * false; }", "未知の演算子: true * false"),
+            (
+                "if (true) {
+                    if (true) {
+                        return false / false;
+                    }
+                    0;
+                }",
+                "未知の演算子: false / false",
+            ),
+            ("-true + 100", "未知の演算子: -true"),
+        ];
+
+        for (input, result) in tests {
+            let lexer = lexer::Lexer::new(input);
+            let mut parser = parser::Parser::new(lexer);
+            let program = parser.parse_program().expect("parser error");
+
+            let evaluated = Evaluator::eval(&program);
+
+            match evaluated {
+                Ok(ok) => panic!("エラーを期待しましたが、{:?}でした。", ok),
+                Err(err) => {
+                    let err_info = format!("{}", err);
+                    assert_eq!(err_info, result);
+                }
+            }
         }
     }
 
