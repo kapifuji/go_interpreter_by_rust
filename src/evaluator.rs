@@ -164,27 +164,14 @@ impl Evaluator {
         consequence: &ast::Statement,
         alternative: &Option<Box<ast::Statement>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
-        match condition {
-            object::Object::Boolean(boolean) => {
-                if *boolean == true {
-                    Evaluator::eval_statement(consequence)
-                } else {
-                    if let Some(alternative) = alternative {
-                        Evaluator::eval_statement(alternative)
-                    } else {
-                        Ok(object::Object::Null)
-                    }
-                }
+        if condition.is_truthly() == true {
+            Evaluator::eval_statement(consequence)
+        } else {
+            if let Some(alternative) = alternative {
+                Evaluator::eval_statement(alternative)
+            } else {
+                Ok(object::Object::Null)
             }
-            object::Object::Integer(_) => Evaluator::eval_statement(consequence),
-            object::Object::Null => {
-                if let Some(alternative) = alternative {
-                    Evaluator::eval_statement(alternative)
-                } else {
-                    Ok(object::Object::Null)
-                }
-            }
-            _ => Ok(object::Object::Null),
         }
     }
 
