@@ -6,15 +6,26 @@ pub struct Evaluator {}
 
 impl Evaluator {
     pub fn eval(root: &ast::Program) -> Result<object::Object, Box<dyn std::error::Error>> {
-        Evaluator::eval_statements(&root.statements)
+        Evaluator::eval_statements(&root.statements, true)
     }
 
     fn eval_statements(
         statements: &Vec<ast::Statement>,
+        is_root: bool,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         let mut result = Ok(object::Object::Null);
         for statement in statements {
-            result = Evaluator::eval_statement(&statement);
+            let object = Evaluator::eval_statement(&statement)?;
+            if let object::Object::ReturnValue(value) = object {
+                result = if is_root == true {
+                    Ok(*value)
+                } else {
+                    Ok(object::Object::ReturnValue(value))
+                };
+                break;
+            } else {
+                result = Ok(object);
+            }
         }
 
         return result;
@@ -24,8 +35,12 @@ impl Evaluator {
         statement: &ast::Statement,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match statement {
+            ast::Statement::Return(expression) => {
+                let ret_val = Evaluator::eval_expression(expression)?;
+                Ok(object::Object::ReturnValue(Box::new(ret_val)))
+            }
             ast::Statement::Expression(expression) => Evaluator::eval_expression(expression),
-            ast::Statement::Block(statements) => Evaluator::eval_statements(statements),
+            ast::Statement::Block(statements) => Evaluator::eval_statements(statements, false),
             _ => Ok(object::Object::Null),
         }
     }
@@ -152,6 +167,7 @@ impl Evaluator {
                     Ok(object::Object::Null)
                 }
             }
+            _ => Ok(object::Object::Null),
         }
     }
 
@@ -249,6 +265,30 @@ mod tests {
         for (input, result) in tests {
             let evaluated = test_eval(input);
             assert_eq!(evaluated, result);
+        }
+    }
+
+    #[test]
+    fn test_eval_return_statement() {
+        let tests = [
+            ("return 10;", 10),
+            ("return 100/10", 10),
+            ("return 10; 1234;", 10),
+            ("2*3; return 10; 1234;", 10),
+            (
+                "if (true) {
+                  if (true) {
+                    return 10;
+                  }
+                  0;
+                }",
+                10,
+            ),
+        ];
+
+        for (input, result) in tests {
+            let evaluated = test_eval(input);
+            test_integer_object(&evaluated, result);
         }
     }
 
