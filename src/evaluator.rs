@@ -95,28 +95,12 @@ impl Evaluator {
         operator: operator::Infix,
         right: &object::Object,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
-        match left {
-            object::Object::Integer(left_int) => {
-                if let object::Object::Integer(right_int) = right {
-                    Evaluator::eval_integer_infix_expression(*left_int, operator, *right_int)
-                } else {
-                    Err(error::EvaluatorError::TypeMissMatch {
-                        left: left.clone(),
-                        operator: operator,
-                        right: right.clone(),
-                    })?
-                }
+        match (left, right) {
+            (object::Object::Integer(left_int), object::Object::Integer(right_int)) => {
+                Evaluator::eval_integer_infix_expression(*left_int, operator, *right_int)
             }
-            object::Object::Boolean(left_bool) => {
-                if let object::Object::Boolean(right_bool) = right {
-                    Evaluator::eval_boolean_infix_expression(*left_bool, operator, *right_bool)
-                } else {
-                    Err(error::EvaluatorError::TypeMissMatch {
-                        left: left.clone(),
-                        operator: operator,
-                        right: right.clone(),
-                    })?
-                }
+            (object::Object::Boolean(left_bool), object::Object::Boolean(right_bool)) => {
+                Evaluator::eval_boolean_infix_expression(*left_bool, operator, *right_bool)
             }
             _ => Err(error::EvaluatorError::TypeMissMatch {
                 left: left.clone(),
