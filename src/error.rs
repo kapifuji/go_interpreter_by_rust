@@ -35,6 +35,9 @@ pub enum EvaluatorError {
         operator: operator::Prefix,
         right: object::Object,
     },
+    NotFoundIdentifier {
+        identifier: String,
+    },
 }
 
 impl<'a> std::fmt::Display for ParserError<'a> {
@@ -95,6 +98,9 @@ impl std::fmt::Display for EvaluatorError {
             }
             self::EvaluatorError::UnknowPrefixOperator { operator, right } => {
                 write!(f, "未知の演算子: {}{}", operator.to_code(), right.inspect())
+            }
+            self::EvaluatorError::NotFoundIdentifier { identifier } => {
+                write!(f, "識別子が見つかりません。: {}", identifier)
             }
         }
     }

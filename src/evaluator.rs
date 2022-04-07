@@ -1,4 +1,5 @@
 use crate::ast;
+use crate::environment;
 use crate::error;
 use crate::object;
 use crate::operator;
@@ -6,17 +7,21 @@ use crate::operator;
 pub struct Evaluator {}
 
 impl Evaluator {
-    pub fn eval(root: &ast::Program) -> Result<object::Object, Box<dyn std::error::Error>> {
-        Evaluator::eval_statements(&root.statements, true)
+    pub fn eval(
+        root: &ast::Program,
+        env: &mut environment::Environment,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
+        Evaluator::eval_statements(&root.statements, true, env)
     }
 
     fn eval_statements(
         statements: &Vec<ast::Statement>,
         is_root: bool,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         let mut result = Ok(object::Object::Null);
         for statement in statements {
-            let object = Evaluator::eval_statement(&statement)?;
+            let object = Evaluator::eval_statement(&statement, env)?;
             if let object::Object::ReturnValue(value) = object {
                 result = if is_root == true {
                     Ok(*value)
@@ -34,47 +39,68 @@ impl Evaluator {
 
     fn eval_statement(
         statement: &ast::Statement,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match statement {
+            ast::Statement::Let { identifier, value } => {
+                let identifier = if let ast::Expression::Identifier(ident) = identifier {
+                    ident
+                } else {
+                    unreachable!();
+                };
+                let value = Evaluator::eval_expression(value, env)?;
+                env.Set(identifier.clone(), value);
+                Ok(object::Object::Null)
+            }
             ast::Statement::Return(expression) => {
-                let ret_val = Evaluator::eval_expression(expression)?;
+                let ret_val = Evaluator::eval_expression(expression, env)?;
                 Ok(object::Object::ReturnValue(Box::new(ret_val)))
             }
-            ast::Statement::Expression(expression) => Evaluator::eval_expression(expression),
-            ast::Statement::Block(statements) => Evaluator::eval_statements(statements, false),
+            ast::Statement::Expression(expression) => Evaluator::eval_expression(expression, env),
+            ast::Statement::Block(statements) => Evaluator::eval_statements(statements, false, env),
             _ => Ok(object::Object::Null),
         }
     }
 
     fn eval_expression(
         expression: &ast::Expression,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match expression {
+            ast::Expression::Identifier(identifier) => {
+                if let Some(object) = env.Get(identifier.clone()) {
+                    Ok(object)
+                } else {
+                    Err(error::EvaluatorError::NotFoundIdentifier {
+                        identifier: identifier.clone(),
+                    })?
+                }
+            }
             ast::Expression::Integer(integer) => Ok(object::Object::Integer(*integer)),
             ast::Expression::Boolean(boolean) => Ok(object::Object::Boolean(*boolean)),
             ast::Expression::PrefixExpression {
                 operator,
                 expression,
             } => {
-                let object = Evaluator::eval_expression(expression);
-                Evaluator::eval_prefix_expression(operator.clone(), &(object?))
+                let object = Evaluator::eval_expression(expression, env);
+                Evaluator::eval_prefix_expression(operator.clone(), &(object?), env)
             }
             ast::Expression::InfixExpression {
                 left,
                 operator,
                 right,
             } => {
-                let left = Evaluator::eval_expression(left)?;
-                let right = Evaluator::eval_expression(right)?;
-                Evaluator::eval_infix_expression(&left, operator.clone(), &right)
+                let left = Evaluator::eval_expression(left, env)?;
+                let right = Evaluator::eval_expression(right, env)?;
+                Evaluator::eval_infix_expression(&left, operator.clone(), &right, env)
             }
             ast::Expression::IfExpression {
                 condition,
                 consequence,
                 alternative,
             } => {
-                let condition = Evaluator::eval_expression(condition)?;
-                Evaluator::eval_if_expression(&condition, consequence, &alternative)
+                let condition = Evaluator::eval_expression(condition, env)?;
+                Evaluator::eval_if_expression(&condition, consequence, &alternative, env)
             }
             _ => Ok(object::Object::Null),
         }
@@ -83,10 +109,11 @@ impl Evaluator {
     fn eval_prefix_expression(
         operator: operator::Prefix,
         object: &object::Object,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
-            operator::Prefix::Exclamation => Evaluator::eval_exclamation_operator(object),
-            operator::Prefix::Minus => Evaluator::eval_minus_prefix_operator(object),
+            operator::Prefix::Exclamation => Evaluator::eval_exclamation_operator(object, env),
+            operator::Prefix::Minus => Evaluator::eval_minus_prefix_operator(object, env),
         }
     }
 
@@ -94,13 +121,14 @@ impl Evaluator {
         left: &object::Object,
         operator: operator::Infix,
         right: &object::Object,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match (left, right) {
             (object::Object::Integer(left_int), object::Object::Integer(right_int)) => {
-                Evaluator::eval_integer_infix_expression(*left_int, operator, *right_int)
+                Evaluator::eval_integer_infix_expression(*left_int, operator, *right_int, env)
             }
             (object::Object::Boolean(left_bool), object::Object::Boolean(right_bool)) => {
-                Evaluator::eval_boolean_infix_expression(*left_bool, operator, *right_bool)
+                Evaluator::eval_boolean_infix_expression(*left_bool, operator, *right_bool, env)
             }
             _ => Err(error::EvaluatorError::TypeMissMatch {
                 left: left.clone(),
@@ -114,6 +142,7 @@ impl Evaluator {
         left: i32,
         operator: operator::Infix,
         right: i32,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
             operator::Infix::Plus => Ok(object::Object::Integer(left + right)),
@@ -131,6 +160,7 @@ impl Evaluator {
         left: bool,
         operator: operator::Infix,
         right: bool,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
             operator::Infix::Equal => Ok(object::Object::Boolean(left == right)),
@@ -147,12 +177,13 @@ impl Evaluator {
         condition: &object::Object,
         consequence: &ast::Statement,
         alternative: &Option<Box<ast::Statement>>,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         if condition.is_truthly() == true {
-            Evaluator::eval_statement(consequence)
+            Evaluator::eval_statement(consequence, env)
         } else {
             if let Some(alternative) = alternative {
-                Evaluator::eval_statement(alternative)
+                Evaluator::eval_statement(alternative, env)
             } else {
                 Ok(object::Object::Null)
             }
@@ -161,6 +192,7 @@ impl Evaluator {
 
     fn eval_exclamation_operator(
         object: &object::Object,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match object {
             object::Object::Boolean(boolean) => Ok(object::Object::Boolean(!boolean)),
@@ -171,6 +203,7 @@ impl Evaluator {
 
     fn eval_minus_prefix_operator(
         object: &object::Object,
+        env: &mut environment::Environment,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match object {
             object::Object::Integer(integer) => Ok(object::Object::Integer(-integer)),
@@ -284,6 +317,21 @@ mod tests {
     }
 
     #[test]
+    fn test_eval_let_statement() {
+        let tests = [
+            ("let a = 1; a;", 1),
+            ("let a = 1 + 2 * 3; a;", 7),
+            ("let a = 1; let b = a; b;", 1),
+            ("let a = 1; let b = 2; let c = a + b; c;", 3),
+        ];
+
+        for (input, result) in tests {
+            let evaluated = test_eval(input);
+            test_integer_object(&evaluated, result);
+        }
+    }
+
+    #[test]
     fn test_eval_error() {
         let tests = [
             ("5 + true;", "型のミスマッチ: 5 + true"),
@@ -301,6 +349,7 @@ mod tests {
                 "未知の演算子: false / false",
             ),
             ("-true + 100", "未知の演算子: -true"),
+            ("foo", "識別子が見つかりません。: foo"),
         ];
 
         for (input, result) in tests {
@@ -308,7 +357,8 @@ mod tests {
             let mut parser = parser::Parser::new(lexer);
             let program = parser.parse_program().expect("parser error");
 
-            let evaluated = Evaluator::eval(&program);
+            let mut environment = environment::Environment::new();
+            let evaluated = Evaluator::eval(&program, &mut environment);
 
             match evaluated {
                 Ok(ok) => panic!("エラーを期待しましたが、{:?}でした。", ok),
@@ -341,7 +391,8 @@ mod tests {
         let lexer = lexer::Lexer::new(input);
         let mut parser = parser::Parser::new(lexer);
         let program = parser.parse_program().expect("parser error");
-        Evaluator::eval(&program).expect("evaluator error")
+        let mut environment = environment::Environment::new();
+        Evaluator::eval(&program, &mut environment).expect("evaluator error")
     }
 
     fn test_integer_object(object: &object::Object, expected: i32) {
