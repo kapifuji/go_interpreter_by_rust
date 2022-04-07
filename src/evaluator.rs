@@ -3,13 +3,14 @@ use crate::environment;
 use crate::error;
 use crate::object;
 use crate::operator;
+use std::{cell::RefCell, rc::Rc};
 
 pub struct Evaluator {}
 
 impl Evaluator {
     pub fn eval(
         root: &ast::Program,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         Evaluator::eval_statements(&root.statements, true, env)
     }
@@ -17,7 +18,7 @@ impl Evaluator {
     fn eval_statements(
         statements: &Vec<ast::Statement>,
         is_root: bool,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         let mut result = Ok(object::Object::Null);
         for statement in statements {
@@ -39,7 +40,7 @@ impl Evaluator {
 
     fn eval_statement(
         statement: &ast::Statement,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match statement {
             ast::Statement::Let { identifier, value } => {
@@ -49,7 +50,7 @@ impl Evaluator {
                     unreachable!();
                 };
                 let value = Evaluator::eval_expression(value, env)?;
-                env.set(identifier.clone(), value);
+                env.borrow_mut().set(identifier.clone(), value);
                 Ok(object::Object::Null)
             }
             ast::Statement::Return(expression) => {
@@ -64,11 +65,11 @@ impl Evaluator {
 
     fn eval_expression(
         expression: &ast::Expression,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match expression {
             ast::Expression::Identifier(identifier) => {
-                if let Some(object) = env.get(identifier.clone()) {
+                if let Some(object) = env.borrow().get(identifier.clone()) {
                     Ok(object)
                 } else {
                     Err(error::EvaluatorError::NotFoundIdentifier {
@@ -105,7 +106,7 @@ impl Evaluator {
             ast::Expression::Function { parameters, body } => Ok(object::Object::Function {
                 parameters: parameters.clone(),
                 body: body.clone(),
-                environment: env.clone(),
+                environment: environment::Environment::create_enclosed_environment(env.clone()),
             }),
             ast::Expression::Call { function, args } => {
                 let function = Evaluator::eval_expression(function, env)?;
@@ -118,7 +119,7 @@ impl Evaluator {
 
     fn eval_expressions(
         expressions: &Vec<ast::Expression>,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<Vec<object::Object>, Box<dyn std::error::Error>> {
         let mut result = Vec::new();
 
@@ -133,7 +134,7 @@ impl Evaluator {
     fn eval_prefix_expression(
         operator: operator::Prefix,
         object: &object::Object,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
             operator::Prefix::Exclamation => Evaluator::eval_exclamation_operator(object, env),
@@ -145,7 +146,7 @@ impl Evaluator {
         left: &object::Object,
         operator: operator::Infix,
         right: &object::Object,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match (left, right) {
             (object::Object::Integer(left_int), object::Object::Integer(right_int)) => {
@@ -166,7 +167,7 @@ impl Evaluator {
         left: i32,
         operator: operator::Infix,
         right: i32,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
             operator::Infix::Plus => Ok(object::Object::Integer(left + right)),
@@ -184,7 +185,7 @@ impl Evaluator {
         left: bool,
         operator: operator::Infix,
         right: bool,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match operator {
             operator::Infix::Equal => Ok(object::Object::Boolean(left == right)),
@@ -201,7 +202,7 @@ impl Evaluator {
         condition: &object::Object,
         consequence: &ast::Statement,
         alternative: &Option<Box<ast::Statement>>,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         if condition.is_truthly() == true {
             Evaluator::eval_statement(consequence, env)
@@ -224,18 +225,20 @@ impl Evaluator {
             environment,
         } = object
         {
-            let mut environment =
-                environment::Environment::create_enclosed_environment(environment);
+            let new_env = environment::Environment::create_enclosed_environment(Rc::new(
+                RefCell::new(environment),
+            ));
+            let mut new_env = Rc::new(RefCell::new(new_env));
 
             for (parameter, arg) in parameters.iter().zip(args.iter()) {
                 if let ast::Expression::Identifier(identifier) = parameter {
-                    environment.set(identifier.clone(), arg.clone());
+                    new_env.borrow_mut().set(identifier.clone(), arg.clone());
                 } else {
                     unreachable!();
                 }
             }
 
-            let evaluated = Evaluator::eval_statement(&body, &mut environment)?;
+            let evaluated = Evaluator::eval_statement(&body, &mut new_env)?;
             if let object::Object::ReturnValue(object) = evaluated {
                 Ok(*object)
             } else {
@@ -248,7 +251,7 @@ impl Evaluator {
 
     fn eval_exclamation_operator(
         object: &object::Object,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match object {
             object::Object::Boolean(boolean) => Ok(object::Object::Boolean(!boolean)),
@@ -259,7 +262,7 @@ impl Evaluator {
 
     fn eval_minus_prefix_operator(
         object: &object::Object,
-        env: &mut environment::Environment,
+        env: &mut Rc<RefCell<environment::Environment>>,
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match object {
             object::Object::Integer(integer) => Ok(object::Object::Integer(-integer)),
@@ -450,8 +453,8 @@ mod tests {
             let mut parser = parser::Parser::new(lexer);
             let program = parser.parse_program().expect("parser error");
 
-            let mut environment = environment::Environment::new();
-            let evaluated = Evaluator::eval(&program, &mut environment);
+            let environment = environment::Environment::new();
+            let evaluated = Evaluator::eval(&program, &mut Rc::new(RefCell::new(environment)));
 
             match evaluated {
                 Ok(ok) => panic!("エラーを期待しましたが、{:?}でした。", ok),
@@ -484,8 +487,8 @@ mod tests {
         let lexer = lexer::Lexer::new(input);
         let mut parser = parser::Parser::new(lexer);
         let program = parser.parse_program().expect("parser error");
-        let mut environment = environment::Environment::new();
-        Evaluator::eval(&program, &mut environment).expect("evaluator error")
+        let environment = environment::Environment::new();
+        Evaluator::eval(&program, &mut Rc::new(RefCell::new(environment))).expect("evaluator error")
     }
 
     fn test_integer_object(object: &object::Object, expected: i32) {

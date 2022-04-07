@@ -3,10 +3,11 @@ use go_interpreter::evaluator::Evaluator;
 use go_interpreter::lexer::Lexer;
 use go_interpreter::parser::Parser;
 use std::io::{stdin, stdout, Write};
+use std::{cell::RefCell, rc::Rc};
 
 fn main() {
     let prompt = ">> ";
-    let mut environment = Environment::new();
+    let mut environment = Rc::new(RefCell::new(Environment::new()));
     loop {
         print!("{}", prompt);
         stdout().flush().unwrap();

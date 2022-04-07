@@ -1,10 +1,10 @@
 use crate::object;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Environment {
     store: HashMap<String, object::Object>,
-    outer: Option<Box<Environment>>,
+    outer: Option<Rc<RefCell<Environment>>>,
 }
 
 impl Environment {
@@ -15,9 +15,9 @@ impl Environment {
         }
     }
 
-    pub fn create_enclosed_environment(outer: Environment) -> Environment {
+    pub fn create_enclosed_environment(outer: Rc<RefCell<Environment>>) -> Environment {
         let mut environment = Environment::new();
-        environment.outer = Some(Box::new(outer));
+        environment.outer = Some(outer);
         environment
     }
 
@@ -26,7 +26,7 @@ impl Environment {
             Some(value) => Some(value.clone()),
             None => {
                 if let Some(outer) = &self.outer {
-                    outer.get(name)
+                    outer.borrow().get(name)
                 } else {
                     None
                 }
