@@ -102,6 +102,11 @@ impl Evaluator {
                 let condition = Evaluator::eval_expression(condition, env)?;
                 Evaluator::eval_if_expression(&condition, consequence, &alternative, env)
             }
+            ast::Expression::Function { parameters, body } => Ok(object::Object::Function {
+                parameters: parameters.clone(),
+                body: body.clone(),
+                environment: env.clone(),
+            }),
             _ => Ok(object::Object::Null),
         }
     }
@@ -329,6 +334,23 @@ mod tests {
             let evaluated = test_eval(input);
             test_integer_object(&evaluated, result);
         }
+    }
+
+    #[test]
+    fn test_eval_function_object() {
+        let input = "fn(x) { x + 2; }";
+
+        let evaluated = test_eval(input);
+        let (params, body) = match evaluated {
+            object::Object::Function {
+                parameters, body, ..
+            } => (parameters, body),
+            other => panic!("Object::Functionを期待しましたが、{:?}でした。", other),
+        };
+
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0].to_code(), "x");
+        assert_eq!(body.to_code(), "{\n(x + 2);\n}");
     }
 
     #[test]

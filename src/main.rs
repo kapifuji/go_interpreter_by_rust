@@ -28,6 +28,8 @@ fn main() {
                 continue;
             }
         };
-        print!("{}", evaluated.inspect());
+        if evaluated.inspect() != "" {
+            println!("{}", evaluated.inspect());
+        }
     }
 }

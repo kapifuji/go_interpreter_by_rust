@@ -4,7 +4,7 @@ pub struct Program {
     pub statements: Vec<Statement>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Statement {
     Let {
         identifier: Expression,
@@ -15,7 +15,7 @@ pub enum Statement {
     Block(Vec<Statement>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expression {
     Illegal,
     Identifier(String),
@@ -62,7 +62,7 @@ impl Program {
 }
 
 impl Statement {
-    fn to_code(&self) -> String {
+    pub fn to_code(&self) -> String {
         let mut code = "".to_string();
         match self {
             Statement::Let { identifier, value } => {
@@ -96,7 +96,7 @@ impl Statement {
 }
 
 impl Expression {
-    fn to_code(&self) -> String {
+    pub fn to_code(&self) -> String {
         match self {
             Expression::Identifier(identifier) => identifier.to_string(),
             Expression::Integer(integer) => integer.to_string(),
