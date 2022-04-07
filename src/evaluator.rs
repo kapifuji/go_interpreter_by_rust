@@ -49,7 +49,7 @@ impl Evaluator {
                     unreachable!();
                 };
                 let value = Evaluator::eval_expression(value, env)?;
-                env.Set(identifier.clone(), value);
+                env.set(identifier.clone(), value);
                 Ok(object::Object::Null)
             }
             ast::Statement::Return(expression) => {
@@ -68,7 +68,7 @@ impl Evaluator {
     ) -> Result<object::Object, Box<dyn std::error::Error>> {
         match expression {
             ast::Expression::Identifier(identifier) => {
-                if let Some(object) = env.Get(identifier.clone()) {
+                if let Some(object) = env.get(identifier.clone()) {
                     Ok(object)
                 } else {
                     Err(error::EvaluatorError::NotFoundIdentifier {
@@ -107,8 +107,27 @@ impl Evaluator {
                 body: body.clone(),
                 environment: env.clone(),
             }),
+            ast::Expression::Call { function, args } => {
+                let function = Evaluator::eval_expression(function, env)?;
+                let args = Evaluator::eval_expressions(args, env)?;
+                Evaluator::apply_function(function, args)
+            }
             _ => Ok(object::Object::Null),
         }
+    }
+
+    fn eval_expressions(
+        expressions: &Vec<ast::Expression>,
+        env: &mut environment::Environment,
+    ) -> Result<Vec<object::Object>, Box<dyn std::error::Error>> {
+        let mut result = Vec::new();
+
+        for expression in expressions {
+            let evaluated = Evaluator::eval_expression(expression, env)?;
+            result.push(evaluated);
+        }
+
+        Ok(result)
     }
 
     fn eval_prefix_expression(
@@ -192,6 +211,38 @@ impl Evaluator {
             } else {
                 Ok(object::Object::Null)
             }
+        }
+    }
+
+    fn apply_function(
+        object: object::Object,
+        args: Vec<object::Object>,
+    ) -> Result<object::Object, Box<dyn std::error::Error>> {
+        if let object::Object::Function {
+            parameters,
+            body,
+            environment,
+        } = object
+        {
+            let mut environment =
+                environment::Environment::create_enclosed_environment(environment);
+
+            for (parameter, arg) in parameters.iter().zip(args.iter()) {
+                if let ast::Expression::Identifier(identifier) = parameter {
+                    environment.set(identifier.clone(), arg.clone());
+                } else {
+                    unreachable!();
+                }
+            }
+
+            let evaluated = Evaluator::eval_statement(&body, &mut environment)?;
+            if let object::Object::ReturnValue(object) = evaluated {
+                Ok(*object)
+            } else {
+                Ok(evaluated)
+            }
+        } else {
+            unreachable!();
         }
     }
 
@@ -351,6 +402,26 @@ mod tests {
         assert_eq!(params.len(), 1);
         assert_eq!(params[0].to_code(), "x");
         assert_eq!(body.to_code(), "{\n(x + 2);\n}");
+    }
+
+    #[test]
+    fn test_eval_function_application() {
+        let tests = [
+            ("let identity = fn(x) { x }; identity(10);", 10),
+            ("let identity = fn(x) { return x; }; identity(10);", 10),
+            ("let double = fn(x) { x * 2; }; double(10);", 20),
+            ("let add = fn(x, y) { x + y; }; add(10, 20);", 30),
+            (
+                "let add = fn(x, y) { x + y; }; add(add(10, 20), 30 + 40);",
+                100,
+            ),
+            ("fn(x) { x; }(10);", 10),
+        ];
+
+        for (input, result) in tests {
+            let evaluated = test_eval(input);
+            test_integer_object(&evaluated, result);
+        }
     }
 
     #[test]
